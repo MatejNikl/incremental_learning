@@ -23,41 +23,52 @@
 \section*{(Dynamic) Neural Network Modules}
 
 This paper tries to address the task of (visual) question answering. One might try to approach this problem with a single, monolithic, deep NN, which would somehow try to answer all possible questions about all possible images (or \textit{worlds} as they are called in general). Authors of this paper, however, tried to tackle this problem in a different way. Take for example a question ``What si in the sheep's ear?''. It can be broken down into smaller subtasks/processing steps:
-\begin{enumerate}
-    \item find sheeps
-    \item find ears
-    \item \textit{intersect} those two locations
-    \item describe what is in the intersection
-\end{enumerate}
-
+    \begin{enumerate}
+        \item Find sheeps
+        \item Find ears
+        \item \textit{Intersect} those two locations
+        \item Describe what is in the intersection
+    \end{enumerate}
 Those subtasks arise in every question because of the compositional nature of language.
 
-\begin{Figure}
-    \centering
-    \frame{\includegraphics[width=0.48\textwidth]{sheep.png}}
-    \frame{\includegraphics[width=0.48\textwidth]{bird.png}}
-    \captionof{figure}{examples of network instances and their computations}
-\end{Figure}
+    \begin{Figure}
+        \centering
+        \frame{\includegraphics[width=0.48\textwidth]{sheep.png}}
+        \frame{\includegraphics[width=0.48\textwidth]{bird.png}}
+        \captionof{figure}{examples of network instances and their computations}
+    \end{Figure}
 
-    Applying these operations would lead to the correct answer. Thus, it was proposed to use such modules that would compute those simpler operations and compose them for each question in a way that would lead to a correct answer being produced. This gives a rise to a few more problems to solve. What types of modules do we need to sufficiently express any question given? How these modules should be designed, how will they communicate and how will we train them? And finally, how to determine how to arrange those modules into a network so that it would answer the question given?
+Applying these operations would lead to the correct answer. Thus, it was proposed to use such modules that would compute those simpler operations and compose them for each question in a way that would lead to a correct answer. This gives a rise to a few more problems to solve:
 
-This is the minimal set of modules described in the paper:
-\begin{itemize}
-    \item Lookup
-    \item Find$[x]$ – finds/locates $x$ and produces attention map
-    \item Relate – similiar to find, also takes in account current region of attention
-    \item And – perform a \textit{intersect} operation on attention maps
-    \item Describe – predicts an answer representation from attention map
-    \item Exists
-\end{itemize}
-
+\subsubsection*{What types of modules do we need to sufficiently express any question given?}
+General module types and their general purposes are hand-crafted and for the problem of (V)QA were in this work created these modules:
+    \begin{itemize}
+        \item Lookup$[i]$ – produces an attention focused entirely at the index $i$, where the positions in the input map are known ahead of time (e.g. string matches on database fields)
+        \item Find$[i]$ – produces an attention map by finding/locating $i$ 
+        \item Relate$[i](h)$ – similiar to find, also takes in account current region of attention $h$
+        \item And$(h^1, h^2, \dots)$ – perform a \textit{intersect} operation on attention maps (by elementwise multiplication of the attention maps)
+        \item Describe$[i](h)$ – predicts a label from a weighted feature wector (with $i$) under the input attention $h$
+        \item Exists$(h)$ – existentional quantifier examining directly the attention map $h$ to produce a label
+    \end{itemize}
 They all have their own purposes and might be useful on their own, however their true
-power comes when they get arranged to form a tree of operations, applying one after another, performing potentially more complex computation at each step.
+power comes when they get arranged to form a tree of operations, applying one after another, performing potentially more and more complex computation with each consecutive processing.
 
-\subsection*{Assembling modules into networks}
+\subsubsection*{How do the modules communicate?}
+In this proposed framework we essentialy have 3 types of information flowing in/out of the modules:
+    \begin{itemize}
+        \item Image (world) data
+        \item Attention map
+        \item Label
+    \end{itemize}
+And because different modules might require different types of inputs as well as might produce different types of outputs, they cannot be assembled in all combinations possible. That is, however, not a flaw and it does not impose any practical limitation, because all the meaningful \textit{layouts} are possible.
+
+\subsubsection*{How will the modules learn?}
+    Since all the modules' operations are differentiable, we can maximize the log-likelihood of the correct answer being produced (with a standard backpropagation algorithm).
+
+% \subsubsection*{How to determine how to arrange those modules into a network so that it would answer the question given?}
+\subsubsection*{How to create a proper network layout for the question given?}
     The proposed approach is to perform a syntactic parse on the question to generate a small set of layout candidates. To choose the best one, all layouts need to be scored. For that a LSTM representation of the question, as well as a feature-based representation of the layout being scored, are produced and passed through a MLP. The layout feature vector includes indicators of the number of modules of each type present and their arguments (e.g. that a find module is looking for a dog).
-
-    As soon as we choose our best layout, we can maximize the log-likelihood of the correct answer being produced (with a standard backpropagation). However, choosing the best layout is nondifferentiable, thus different technique called reinforcement learning must be used.
+ However, choosing the best layout is nondifferentiable, thus different technique called reinforcement learning to train the scoring MLP must be used.
 
 \end{multicols}
 \end{document}
