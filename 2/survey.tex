@@ -4,6 +4,12 @@
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \usepackage{caption}
+\usepackage{fullpage}
+\usepackage{titlesec}
+
+\titleformat*{\section}{\large\bfseries}
+\titleformat*{\subsection}{\normalsize\bfseries}
+\titleformat*{\subsubsection}{\small\bfseries}
 
 \newcommand{\D}{\mathcal{D}}
 \newcommand{\T}{\mathcal{T}}
@@ -35,7 +41,7 @@ A few definitions:
         \begin{itemize}
             \item $x_i \in \X$ and $y_i \in \Y$
             \item $D_S$, $D_T$ $-$ source and target data with $n_S$ and $n_T$ instances each
-            \item In most cases $0 \le n_T \ll n_S$.
+            \item in most cases $0 \le n_T \ll n_S$
         \end{itemize}
     \item \textbf{Transfer Learning} $-$ given $\D_S$, $\T_S$, $\D_T$ and $\T_T$, transfer learning aims to help improve the learning of the target predictive function $f_T(\cdot)$ in $\D_T$ using the knowledge in $\D_S$ and $\T_S$, where $\D_S \ne \D_T$, or $\T_S \ne \T_T$
         \begin{itemize}
@@ -54,17 +60,73 @@ There are three main research issues:
     \item \textbf{When} to transfer $-$ in which situations should transferring be done as well as in which it should not be done $-$ when source and target domains are not related to each other, transferring the knowledge may even hurt the performace $-$ a phenomenon called \textit{negative transfer}
 \end{enumerate}
 
+Based on the definition of transfer learning, its relationship can be summarized into three sub-settings:
 
-    % \begin{figure}[!h]
-    %     \centering
-    %     \frame{\includegraphics[width=0.4\textwidth]{sheep.png}}
-    %     \frame{\includegraphics[width=0.4\textwidth]{bird.png}}
-    %     \captionof{figure}{Examples of network instances and their computation processes}
-    % \end{figure}
+\begin{enumerate}
+    \item \textbf{Inductive Transfer Learning}
+        \begin{itemize}
+            \item $\T_S \ne \T_T$
+            \item a few labeled data in $\D_T$ are required to \textit{induce} $f_T(\cdot)$ for use in $\D_T$
+        \end{itemize}
+        Further categorization:
+        \begin{enumerate}
+            \item A lot of labeled data in $\D_S$ $-$ similar to the multi-task learning
+            \item No labeled data in $\D_S$ $-$ similar to the self-taught learning
+        \end{enumerate}
+    \item \textbf{Transductive Transfer Learning}
+        \begin{itemize}
+            \item $\D_S \ne \D_T$, $\T_S = \T_T$
+            \item A lot of labeled data in $\D_S$, no labeled data in $\D_T$ (thus some unlabeled data in $\D_T$ must be available)
+        \end{itemize}
+        Further categorization:
+        \begin{enumerate}
+            \item $\X_S \ne \X_T$
+            \item $\X_S = \X_T$, but $P(X_S) \ne P(X_T)$, is related to:
+                \begin{itemize}
+                    \item domain adaptation for knowledge transfer in text classification
+                    \item sample selection bias
+                    \item co-variate shift
+                \end{itemize}
+        \end{enumerate}
+    \item \textbf{Unsupervised Transfer Learning}
+        \begin{itemize}
+            \item $\T_S \ne \T_T$, $\Y_S$ and $\Y_T$ are not observable
+            \item different focus $-$ clustering, dimensionality reduction, density estimation
+            \item the predicted labels are latent variables, such as clusters or reduced dimensions
+        \end{itemize}
+\end{enumerate}
 
-\subsection*{Principles of modularization}
-\subsection*{Principles of growing}
-NEKAM TYHLE SEKCE VECPAT OMG
-\subsubsection*{Module types}
+Approaches to the above three different settings can be summarized into four cases based on what to transfer:
+
+\begin{enumerate}
+    \item \textbf{Instance-based transfer learning} $-$ assumes that certain parts of the data in $\D_S$ can be reused for learning in $\D_T$ by re-weighting or importance sampling
+    \item \textbf{Feature-representation-transfer} $-$ learning a ``good'' feature representation for $\D_T$, thus (hopefully) improving the performance significantly
+    \item \textbf{Parameter-transfer} $-$ assumes that $\T_S$ and $\T_T$ share some parameters or prior distributions of the hyper-parameters of the models
+    \item \textbf{Relational-knowledge-transfer} $-$ assumes that relationship among the data in $\D_S$ and $\D_T$ are similar
+\end{enumerate}
+
+\section{Inductive Transfer Learning}
+\subsection{Transferring Knowledge of Instances}
+$\D_S$ data cannot be used directly, however certain parts possibly can $-$ together with a few labeled data in $\D_T$.
+
+TrAdaBoost boosting algorithm (extension of AdaBoost) addresses this problem, assumes $\X_S = \X_T$ and $\Y_S = \Y_T$, but $P(X_S) \ne P(X_T)$. It iteratively re-weights the $\D_S$ data to reduce the effect of the ``bad'' source data while encourage the ``good'' source data to contribute more for $\D_T$.
+
+There are also other algorithms, e.g. a heuristic method to remove ``misleading'' training examples from $\D_S$ based on the difference between conditional probabilities $P(y_S|x_S)$ and $P(y_T|x_T)$.
+
+\subsection{Transferring Knowledge of Feature Representations}
+There are different strategies for different types of $\D_S$ data for finding ``good'' feature reprezentations to minimize domain divergence and classification or regression model error.
+
+
+\subsubsection{Supervised Feature Construction}
+\subsubsection{Unsupervised Feature Construction}
+\subsection{Transferring Knowledge of Parameters}
+\subsection{Transferring Relational Knowledge}
+
+\section{Transductive Transfer Learning}
+\subsection{Transferring Knowledge of Instances}
+\subsection{Transferring Knowledge of Feature Representations}
+
+\section{Unsupervised Transfer Learning}
+\subsection{Transferring Knowledge of Feature Representations}
 
 \end{document}
