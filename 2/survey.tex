@@ -4,7 +4,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \usepackage{caption}
-% \usepackage{fullpage}
+\usepackage{fullpage}
 \usepackage{titlesec}
 
 \titleformat*{\section}{\large\bfseries}
@@ -161,18 +161,18 @@ Another approach on this task is based on a form of second-order Markov logic $-
 Most approaches are motivoted by importance sampling. We can learn the optimal parameters $\theta$ by minimazing the empirical risk (ERM):
 
 \[
-    \Theta = \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_T} P(D_T)l(x, y, \theta)
+    \theta = \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_T} P(D_T)l(x, y, \theta)
 \]
 
 However, since no labeled data in $D_T$ are observed and $P(D_S) = P(D_T)$, we may simply learn the model:
 \[
-    \Theta = \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_S} P(D_S)l(x, y, \theta)
+    \theta = \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_S} P(D_S)l(x, y, \theta)
 \]
 
 If $P(D_S) \ne P(D_T)$:
 
 \begin{align*}
-    \Theta &= \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_S} \frac{P(D_T)}{P(D_S)}P(D_S)l(x, y, \theta) \\
+    \theta &= \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_S} \frac{P(D_T)}{P(D_S)}P(D_S)l(x, y, \theta) \\
            &\approx \argmin_{\theta \in \Theta} \sum_{i = 1}^{n_S} \frac{P_T(x_{T_i}, y_{T_i})}{P_S(x_{S_i}, y_{S_i})}l(x, y, \theta) \\
            &= \argmin_{\theta \in \Theta} \sum_{i = 1}^{n_S} \frac{P(x_{S_i})}{P(x_{T_i})}l(x, y, \theta)
 \end{align*}
@@ -187,8 +187,45 @@ Various ways to estimate the fraction exist. One way is to estimate the terms in
 \end{itemize}
 
 \subsection{Transferring Knowledge of Feature Representations}
+Most approaches are under unsupervised learning frameworks. A structural corespondence learning (SCL) algorithm is proposed. It makes use of the unlabeled data from $\D_T$ to extract relevant features that may reduce the difference between the domains:
+\begin{enumerate}
+    \item define a set of $m$ \textit{pivot} features (which are domain specific and depend on prior knowledge) on the unlabeled data from both domains
+    \item remove the pivot features from the data and theat each as a new label vector
+    \item construct $m$ classification problems
+    \item by assuming each can be solved by linear classifier, learn a matrix $W = [w_1 w_2 \ldots w_m]$ of parameters
+    \item SVD is applied $W = UDV^T$, then $\theta = U_{[1:h,:]}^T$ ($h$ being the number of shared features) is the linear mapping whose rows are the top left singuular vectors of $W$.
+    \item apply standard discriminative algorithms to the augmented feature vector to build models
+\end{enumerate}
+The drawback is that the pivot features must be well designed, which is difficult and domain-dependent.
+
+A heuristic for selecting pivot features for natural language processing (NLP) problems exists (e.g. tagging of sentences), the follow-up work proposes using Mutual Information (MI) to choose the pivot features. MI-SCL tries to find some pivot features that have high dependence on the labels in $\D_S$.
+
+In domain adaptation (transfer learning in NLP domain) a kernel-mapping function was proposed $-$ it maps data from both $\D_S$ and $\D_T$ to a high-dimensional feature space, where standard methods are used to train classifiers. However, the constructed mapping function is domain knowledge driven, thus hard to generalize to other domains.
+
+Other approaches include:
+\begin{itemize}
+    \item a co-clustering based algorithm to propagate the label information across domains
+    \item a bridged refinement algorithm $-$ it corrects the labels predicted by a shift-unaware classifier towards a target distribution and takes the mixture distribution of the training and test data as a bridge to better transfer from the training data to the test data
+    \item a spectral classification framework, where the objective function is introduced to seek consistency between the in-domain supervision and the out-of-domain intrinsic structure
+    \item dimensionality reduction $-$ Maximum Mean Discrepancy Embedding (MMDE) algorithm and more efficient feature extraction algorithm known as Transfer Component Analysis (TCA)
+\end{itemize}
 
 \section{Unsupervised Transfer Learning}
+A little research work on this setting has been done.
+
 \subsection{Transferring Knowledge of Feature Representations}
+Self-taught clustering (STC) algorithm is an instance of unsupervised transfer learning. It aims at clustering a small amount of unlabeled data in $\D_T$ with help of a large amount in the $\D_S$. It tries to lear common feature space across domains. An iterative algorithm is used to solve the optimization function given by STC.
+
+Transferred discriminative analysis (TDA) tries to solve the transfer dimensionality reduction problem. It runs iteratively:
+\begin{enumerate}
+    \item apply clustering to generate pseudo-class labels for the $D_T$
+    \item apply dimensionality reduction methods
+\end{enumerate}
+to find the best subspace for $D_T$.
+
+\subsection*{Transfer bounds}
+It would be very useful to know the ``right'' amount of information to transfer. It has been done using conditional Kolmogorov complexity to measure relatedness between tasks.
+
+Another approach is a graph-based method. It embeds the set of learned source models in a graph using transferability as a metric. Transferring to a new task proceeds by using this graph by mapping the problem into it and learning a function to automatically determine the parameters to transfer.
 
 \end{document}
