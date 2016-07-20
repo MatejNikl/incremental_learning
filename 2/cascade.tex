@@ -12,7 +12,7 @@
 
 \newcommand*\mean[1]{\overline{#1}}
 
-\title{The Cascade-Correlation Learning architecture $-$ summary}
+\title{The Cascade-Correlation Learning Architecture $-$ summary}
 \author{Matěj Nikl}
 
 \begin{document}
@@ -27,7 +27,7 @@ The network starts with no hidden units, only output units are present. Then, on
 \begin{figure}[!h]
     % \centering
     \includegraphics[width=0.475\textwidth]{cascade.png}
-    \caption{The CCA after two hidden units have been added. The vertical lines sum all incoming activation. Boxed connections are frozen, X connections are trained repeatedly.}
+    \caption{The CCA after two hidden units have been added. The vertical lines sum all incoming activations. Boxed connections are frozen, X connections are trained repeatedly.}
 \end{figure}
 
 \section{Training}
@@ -66,7 +66,7 @@ If network's test error is not low enought, we need to add a new hidden unit. To
 \section{Principles of modularization}
 The only sense of modularization in the CCA can be seen in viewing individual hidden units as modules, since they are being added throughout the learning process. However, the network as a whole is not modular in the full sense. Hidden units cannot be detached from a network and reattached to a different one. A hidden unit can only be used in conjunction with the hidden units it has been trained with and nowhere else.
 \paragraph{Similar design}
-A similar partially modular design can be seen in Progressive Neural Networks, where a new columns (a full blown NNs) are being added with lateral connections to all of the previously trained columns, showing the same aspects of \textit{(non)modularity} as CCAs.
+A similar partially modular design can be seen in Progressive Neural Networks, where new columns (full-blown NNs) are being added with lateral connections to all of the previously trained columns, showing the same aspects of \textit{(non)modularity} as CCAs.
 
 
 \end{document}
