@@ -2,10 +2,9 @@
 
 \usepackage[english]{babel}
 \usepackage[utf8]{inputenc}
-\usepackage{graphicx}
-\usepackage{caption}
 \usepackage{fullpage}
 \usepackage{titlesec}
+\usepackage{amsmath}
 
 \titleformat*{\section}{\large\bfseries}
 \titleformat*{\subsection}{\normalsize\bfseries}
@@ -16,7 +15,6 @@
 \newcommand{\X}{\mathcal{X}}
 \newcommand{\Y}{\mathcal{Y}}
 
-\usepackage{amsmath}
 \DeclareMathOperator*{\argmin}{arg\,min}
 
 \title{A Survey on Transfer Learning $-$ summary}
@@ -123,7 +121,7 @@ If a lot of labeled data in $\D_S$ are available, supervised learning can be use
 Otherwise, unsupervised learning must be used.
 
 \subsubsection{Supervised Feature Construction}
-The basic idea is to lear a low-dimensional representation that is shared across related tasks. The learned representation can reduce the classification or regression model error of each task as well. It is done by solving an optimization problem, which can be transformed into an equivalent convex optimization formulation and thus solved efficiently.
+The basic idea is to learn a low-dimensional representation that is shared across related tasks. The learned representation can reduce the classification or regression model error of each task as well. It is learned by solving an optimization problem, which can be transformed into an equivalent convex optimization formulation and thus solved efficiently.
 \subsubsection{Unsupervised Feature Construction}
 The proposed solution is to apply sparse coding $-$ a unsupervised feature construction method, for learning \textit{higher level} features for transfer learning.
 It consists of two (three) steps
@@ -149,7 +147,7 @@ Differently from other three contexts, this approach deals with data that are no
 
 A \textit{TAMAR} algorithm transfers relational knowledge with Markov Logic Networks (MLNs). MLN uses predicates to represent entities in a relational domain, while their relationships are represented in first-order logic. The idea is that if two domains are related to each other, there may exist mappings to connect entities and their relationships from $\D_S$ to $\D_T$ (e.g. academic domain$-$professor and industrial management domain$-$manager). TAMAR tries to use an MLN learned for $\D_S$ to aid the learning of an MLN for $\D_T$:
 \begin{enumerate}
-    \item a mapping from a source MLN to $\D_T$ based on weighted pseude loglikelihood measure (WPLL) is created
+    \item a mapping from a source MLN to $\D_T$ based on weighted pseudo-loglikelihood measure (WPLL) is created
     \item a revision of the mapped structure is done using the \textit{FORTE} algorithm $-$ revising the first order theories
 \end{enumerate}
 The revised MLN can be used as a relational model for inference or reasoning in $\D_T$.
@@ -158,7 +156,7 @@ Another approach on this task is based on a form of second-order Markov logic $-
 
 \section{Transductive Transfer Learning}
 \subsection{Transferring Knowledge of Instances}
-Most approaches are motivoted by importance sampling. We can learn the optimal parameters $\theta$ by minimazing the empirical risk (ERM):
+Most approaches are motivoted by importance sampling. We can learn the optimal parameters $\theta$ by minimizing the empirical risk (ERM):
 
 \[
     \theta = \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_T} P(D_T)l(x, y, \theta)
@@ -214,7 +212,7 @@ Other approaches include:
 A little research work on this setting has been done.
 
 \subsection{Transferring Knowledge of Feature Representations}
-Self-taught clustering (STC) algorithm is an instance of unsupervised transfer learning. It aims at clustering a small amount of unlabeled data in $\D_T$ with help of a large amount in the $\D_S$. It tries to lear common feature space across domains. An iterative algorithm is used to solve the optimization function given by STC.
+Self-taught clustering (STC) algorithm is an instance of unsupervised transfer learning. It aims at clustering a small amount of unlabeled data in $\D_T$ with help of a large amount in the $\D_S$. It tries to learn common feature space across domains. An iterative algorithm is used to solve the optimization function given by STC.
 
 Transferred discriminative analysis (TDA) tries to solve the transfer dimensionality reduction problem. It runs iteratively:
 \begin{enumerate}
@@ -226,6 +224,6 @@ to find the best subspace for $D_T$.
 \subsection*{Transfer bounds}
 It would be very useful to know the ``right'' amount of information to transfer. It has been done using conditional Kolmogorov complexity to measure relatedness between tasks.
 
-Another approach is a graph-based method. It embeds the set of learned source models in a graph using transferability as a metric. Transferring to a new task proceeds by using this graph by mapping the problem into it and learning a function to automatically determine the parameters to transfer.
+Another approach is a graph-based method. It embeds a set of learned source models in a graph using transferability as a metric. Transferring to a new task proceeds by using this graph by mapping the problem into it and learning a function to automatically determine the parameters to transfer.
 
 \end{document}
