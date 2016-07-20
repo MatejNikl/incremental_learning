@@ -17,8 +17,8 @@
 
 \begin{document}
 \maketitle
-Convolutional Neural Fabrics (CNFs) is a architecture for embedding an exponentially large number of CNN architectures (via massive parameter sharing). It is intended as a step aside from the conventional CNN model architecture selection problem $-$  it is not trying to solve it, instead it offers the opportunity for the fabric to learn/select the most appropriate model (or even ensemble of models) within itself by standard back-propagation algorithm, leaving only the hyper-parameters of number of layers and channels up to us.
-Other hyper-parameters, which are being ``set'' automatically by embedding in the fabric are:
+Convolutional Neural Fabrics (CNFs) is a architecture for embedding an exponentially large number of CNN architectures (via massive parameter sharing). It is intended as a step aside from the conventional CNN model architecture selection problem $-$  it is not trying to solve it, instead it offers the opportunity for the fabrics to learn/select the most appropriate model (or even ensemble of models) within itself by standard back-propagation algorithm, leaving only the hyper-parameters of number of layers and channels up to us.
+Other hyper-parameters, which are being ``set'' automatically by embedding in the fabrics are:
 \begin{itemize}
     \item filter size per layer
     \item stride per layer
@@ -27,7 +27,7 @@ Other hyper-parameters, which are being ``set'' automatically by embedding in th
     \item size of the pooling regions
     \item ordering of pooling and convolutional layers
     \item channel connectivity pattern between layers
-    \item type of activation (ReLU vs MaxOut) are
+    \item type of activation (ReLU vs MaxOut)
 \end{itemize}
 
 % \section{Defining the Fabric}
@@ -37,8 +37,8 @@ Other hyper-parameters, which are being ``set'' automatically by embedding in th
     \caption{Trellis embedding of two seven-layer CNNs. Trellis nodes receiving the input and producing output are encircled. All edges are oriented to the right, down in the first layer, and towards the ouput in the last layer. The channel dimension of the 3D trellis is omitted for clarity.}
 \end{figure}
 
-\section{Making sense of the Fabric}
-The Fabric consists of a 3D trellis that connects response maps at different layers, scales, and channels with a sparse homogeneous local connectivity pattern.
+\section{Making sense of the Fabrics}
+The Fabrics consist of a 3D trellis that connects response maps at different layers, scales, and channels with a sparse homogeneous local connectivity pattern.
 Each node in the trellis represents a response map with the same number of dimensions as the input signal.
 
 \subsection{The trellis structure}
@@ -68,7 +68,7 @@ Fine-to-coarse change of the resolution of response maps is done using stride-tw
 \end{figure*}
 
 \paragraph{Filter sizes}
-A 5 x 5 filter can be implemented by computing nine intermediate channels to obtain a vectorized version of the 3 x 3 neighborhood at each pixel. A second 3 x 3 convolution can then aggregate values across the original 5 x 5 patch, and output the desired convolution. Repetition allows to umplement every filter of any desired size.
+A 5 x 5 filter can be implemented by computing nine intermediate channels to obtain a vectorized version of the 3 x 3 neighborhood at each pixel. A second 3 x 3 convolution can then aggregate values across the original 5 x 5 patch, and output the desired convolution. Repetition allows to implement every filter of any desired size.
 
 \paragraph{Ordering convolution and re-sampling}
 It is up to the back-propagation algorithm to choose the desired path(s) to use $-$ by setting all, exept one paths weights to zero, a particular sequence of convolutions and re-sampling operators is obtained.
@@ -78,11 +78,9 @@ This sparsely connected among che channel axis trellis suffices to emulate dense
 
 
 \section{Principles of modularization}
-The CNF architecture does not contain any standalone modules. The network itself can utilize some of its parts more, and by weight visualization it can be seen a modules being instationed, maybe even for certain purpopes, however they still make up a integral, inseparable part of the network.
+The CNF architecture does not contain any standalone modules. The network itself can utilize some of its parts more, and by weight visualization it can be seen as modules being instationed, maybe even for certain purpopes, however they still make up a integral, inseparable part of the network.
 
 \section{Principles of growing}
 The CNF architecture does not allow for any more growing as a conventional (C)NN does. Its purpose is not in growing, but in dynamically utilizing its trellis structure, whilst hiding away multiple hyper-parameters.
-
-
 
 \end{document}
