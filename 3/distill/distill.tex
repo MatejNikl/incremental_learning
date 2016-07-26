@@ -25,7 +25,7 @@ Neural networks typically produce class probabilities by using a \textit{softmax
 \[
     q_i = \frac{e^{z_i/T}}{\sum_j e^{z_j/T}}
 \]
-where a temperature $T$ is normally set to 1. Using a higher value for $T$ produces a softer probability distibution over classes.
+where a temperature $T$ is normally set to 1. Using a higher value for $T$ produces a softer probability distribution over classes.
 
 \begin{figure}[!h]
     \includegraphics[width=\columnwidth]{softmax_example.eps}
@@ -43,21 +43,6 @@ For this transfer stage, the same training set or even a different \textit{trans
 For an ensemble of models, an arithmetic or geometric mean of their individual predictive distributions as the soft targets can be used.
 
 Moreover, when the soft targets have high entropy, they provide much more information per training case than hard targets and much less variance in the gradient between training cases, so the small model can often be trained on much less data and using a much higher learning rate.
-
-
-\subsection{Computing the gradient}
-Each case in the trasfer set contributes a cross-entropy gradient, $dC/dz_i$, with respect to each logit, $z_i$, of the distilled model. If the cumbersome model has logits $v_i$, which produce soft target probabilities $p_i$ and the transfer training is done at a temperature of $T$, this gradient is given by:
-\[
-    \frac{\partial C}{\partial z_i} = \frac{1}{T}(q_i - p_i) = \frac{1}{T}\left( \frac{e^{z_i/T}}{\sum_j e^{z_j/T}} - \frac{e^{v_i/T}}{\sum_j e^{v_j/T}} \right)
-\]
-If the temperature is high compared with the magnitude of the logits, we can approximate ($e^x \approx 1+x$ for $x \approx 0$):
-\[
-    \frac{\partial C}{\partial z_i} \approx \frac{1}{T}\left( \frac{1 + z_i/T}{N + \sum_j z_j/T} - \frac{1 + v_i/T}{N + \sum_j v_j/T} \right)
-\]
-If we now assume that the logits have been zero-meaned separately for each transfer case so that $\sum_j z_j = \sum_j v_j = 0$, we can further simplify to:
-\[
-    \frac{\partial C}{\partial z_i} \approx \frac{1}{NT^2} (z_i - v_i)
-\]
 
 \begin{table*}[t]
     \center
@@ -85,6 +70,27 @@ If we now assume that the logits have been zero-meaned separately for each trans
     \caption{Soft targets allow a new model to generalize well from only 3\% of the training set. The soft targets are obtained by training on the full training set.}
 \end{table*}
 
+
+\subsection{Computing the gradient}
+Using the Kullback-Leibler divergence as a loss function:
+\[
+    C = - \sum_i p_i log(q_i)
+\]
+Each case in the transfer set contributes a cross-entropy gradient, $dC/dz_i$, with respect to each logit, $z_i$, of the distilled model. If the cumbersome model has logits $v_i$, which produce soft target probabilities $p_i$ and the transfer training is done at a temperature of $T$, this gradient is given by:
+\[
+    \frac{\partial C}{\partial z_i} = \frac{1}{T}(q_i - p_i) = \frac{1}{T}\left( \frac{e^{z_i/T}}{\sum_j e^{z_j/T}} - \frac{e^{v_i/T}}{\sum_j e^{v_j/T}} \right)
+\]
+If the temperature is high compared with the magnitude of the logits, we can approximate ($e^x \approx 1+x$ for $x \approx 0$):
+\[
+    \frac{\partial C}{\partial z_i} \approx \frac{1}{T}\left( \frac{1 + z_i/T}{N + \sum_j z_j/T} - \frac{1 + v_i/T}{N + \sum_j v_j/T} \right)
+\]
+If we now assume that the logits have been zero-meaned separately for each transfer case so that $\sum_j z_j = \sum_j v_j = 0$, we can further simplify to:
+\[
+    \frac{\partial C}{\partial z_i} \approx \frac{1}{NT^2} (z_i - v_i)
+\]
+So in the high temperature limit, distillation is equivalent to minimizing the L2 distance (MSE) between the soft target probabilities and the distilled model probabilities.
+
+\subsection{Combining the objective functions}
 When the correct labels are known for all or at least some of the transfer set, this method can be significantly improved by also training the distilled model to produce the correct labels. The best way to do it is to use a weighted average of the above defined objective function of cross-entropy with the soft targets and the objective function of cross-entropy with the correct labels (the hard targets). The best results are generally obtained by using a \textit{considerably} lower weight on the second objective function.
 
 \section{Ensembles of specialists on very big datasets}
