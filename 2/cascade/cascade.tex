@@ -40,12 +40,12 @@ The process of training can be divided into two parts, which will be described i
 Having everything except output units' weights frozen translates into optimization of a single layer network, which was one of the authors' goals (to avoid slow back-propagation). The following steps take place:
 \begin{enumerate}
     \item optimize the single layer network, until a convergence is achieved
-    \item evaulate the test error and if it is low enough, stop
+    \item evaluate the test error and if it is low enough, stop
     \item otherwise, proceed to subsection \ref{ssec:unit}
 \end{enumerate}
 
 \subsection{New unit training} \label{ssec:unit}
-If network's test error is not low enought, we need to add a new hidden unit. To do so, the following steps take place:
+If network's test error is not low enough, we need to add a new hidden unit. To do so, the following steps take place:
 \begin{enumerate}
     \item create a pool of \textit{candidate} units, having their input weights randomly initialized, each receiving all available inputs
     \item maximize $S$, the sum of covariances between the candidate unit's value and the residual output error of all output units, for each candidate unit, by adjusting their input weights, until convergence

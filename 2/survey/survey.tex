@@ -58,7 +58,7 @@ There are three main research issues:
 \begin{enumerate}
     \item \textbf{What} to transfer $-$ which part of the knowledge can be transferred across domains or tasks $-$ some of it may be specific for individual domains or tasks, some may be common
     \item \textbf{How} to transfer $-$ learning algorithms need to be developed to transfer the knowledge
-    \item \textbf{When} to transfer $-$ in which situations should transferring be done as well as in which it should not be done $-$ when source and target domains are not related to each other, transferring the knowledge may even hurt the performace $-$ a phenomenon called \textit{negative transfer}
+    \item \textbf{When} to transfer $-$ in which situations should transferring be done as well as in which it should not be done $-$ when source and target domains are not related to each other, transferring the knowledge may even hurt the performance $-$ a phenomenon called \textit{negative transfer}
 \end{enumerate}
 
 Based on the definition of transfer learning, its relationship can be summarized into three sub-settings:
@@ -115,7 +115,7 @@ TrAdaBoost boosting algorithm (extension of AdaBoost) addresses this problem, as
 There are also other algorithms, e.g. a heuristic method to remove ``misleading'' training examples from $\D_S$ based on the difference between conditional probabilities $P(y_S|x_S)$ and $P(y_T|x_T)$.
 
 \subsection{Transferring Knowledge of Feature Representations}
-There are different strategies for different types of $\D_S$ data for finding ``good'' feature reprezentations to minimize domain divergence and classification or regression model error.
+There are different strategies for different types of $\D_S$ data for finding ``good'' feature representations to minimize domain divergence and classification or regression model error.
 
 If a lot of labeled data in $\D_S$ are available, supervised learning can be used (similar to \textit{common feature learning} in the field of multi-task learning).
 Otherwise, unsupervised learning must be used.
@@ -131,19 +131,19 @@ It consists of two (three) steps
     \item (optional) applying discriminative algorithms to train classification or regression models for use in $\D_T$
 \end{enumerate}
 \subsection{Transferring Knowledge of Parameters}
-Most approaches in this section, like a regularization framework and a hierarchical Bayesian framework are designed to work under multi-task learning, however they can be easily modified for transfer learning by adjusting the weights in the loss functions $-$ for example by assignig a larger weight to the loss function of $\D_T$ (thus making it more important to minimize than the loss function of $\D_S$).
+Most approaches in this section, like a regularization framework and a hierarchical Bayesian framework are designed to work under multi-task learning, however they can be easily modified for transfer learning by adjusting the weights in the loss functions $-$ for example by assigning a larger weight to the loss function of $\D_T$ (thus making it more important to minimize than the loss function of $\D_S$).
 
 An example for this task is a MT-IVM algorithm, which is based on Gaussian Processes (GP) – it tries to learn parameters of a GP over multiple tasks by sharing the same GP prior.
 Similar approach uses free-form covariance matrix over tasks to model inter-task dependencies.
 
-Another approach tries to transfer parameters of SVMs under a regularization framework $-$ seperating a parameter $w$ into two terms:
+Another approach tries to transfer parameters of SVMs under a regularization framework $-$ separating a parameter $w$ into two terms:
 \begin{enumerate}
     \item a common term over tasks
     \item a task-specific term
 \end{enumerate}
 
 \subsection{Transferring Relational Knowledge}
-Differently from other three contexts, this approach deals with data that are not idependent and identically distributed (i.i.d.) (or at least it is not assumed that they are) and can be represented by multiple relations, such as networked data or social network data. Statistical relational learning techniques are proposed to solve these problems.
+Differently from other three contexts, this approach deals with data that are not independent and identically distributed (i.i.d.) (or at least it is not assumed that they are) and can be represented by multiple relations, such as networked data or social network data. Statistical relational learning techniques are proposed to solve these problems.
 
 A \textit{TAMAR} algorithm transfers relational knowledge with Markov Logic Networks (MLNs). MLN uses predicates to represent entities in a relational domain, while their relationships are represented in first-order logic. The idea is that if two domains are related to each other, there may exist mappings to connect entities and their relationships from $\D_S$ to $\D_T$ (e.g. academic domain$-$professor and industrial management domain$-$manager). TAMAR tries to use an MLN learned for $\D_S$ to aid the learning of an MLN for $\D_T$:
 \begin{enumerate}
@@ -156,7 +156,7 @@ Another approach on this task is based on a form of second-order Markov logic $-
 
 \section{Transductive Transfer Learning}
 \subsection{Transferring Knowledge of Instances}
-Most approaches are motivoted by importance sampling. We can learn the optimal parameters $\theta$ by minimizing the empirical risk (ERM):
+Most approaches are motivated by importance sampling. We can learn the optimal parameters $\theta$ by minimizing the empirical risk (ERM):
 
 \[
     \theta = \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_T} P(D_T)l(x, y, \theta)
@@ -185,13 +185,13 @@ Various ways to estimate the fraction exist. One way is to estimate the terms in
 \end{itemize}
 
 \subsection{Transferring Knowledge of Feature Representations}
-Most approaches are under unsupervised learning frameworks. A structural corespondence learning (SCL) algorithm is proposed. It makes use of the unlabeled data from $\D_T$ to extract relevant features that may reduce the difference between the domains:
+Most approaches are under unsupervised learning frameworks. A structural correspondence learning (SCL) algorithm is proposed. It makes use of the unlabeled data from $\D_T$ to extract relevant features that may reduce the difference between the domains:
 \begin{enumerate}
     \item define a set of $m$ \textit{pivot} features (which are domain specific and depend on prior knowledge) on the unlabeled data from both domains
-    \item remove the pivot features from the data and theat each as a new label vector
+    \item remove the pivot features from the data and that each as a new label vector
     \item construct $m$ classification problems
     \item by assuming each can be solved by linear classifier, learn a matrix $W = [w_1 w_2 \ldots w_m]$ of parameters
-    \item SVD is applied $W = UDV^T$, then $\theta = U_{[1:h,:]}^T$ ($h$ being the number of shared features) is the linear mapping whose rows are the top left singuular vectors of $W$.
+    \item SVD is applied $W = UDV^T$, then $\theta = U_{[1:h,:]}^T$ ($h$ being the number of shared features) is the linear mapping whose rows are the top left singular vectors of $W$.
     \item apply standard discriminative algorithms to the augmented feature vector to build models
 \end{enumerate}
 The drawback is that the pivot features must be well designed, which is difficult and domain-dependent.

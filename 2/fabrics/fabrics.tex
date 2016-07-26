@@ -34,7 +34,7 @@ Other hyper-parameters, which are being ``set'' automatically by embedding in th
 
 \begin{figure}[!h]
     \includegraphics[width=\columnwidth]{fabrics1.png}
-    \caption{Trellis embedding of two seven-layer CNNs. Trellis nodes receiving the input and producing output are encircled. All edges are oriented to the right, down in the first layer, and towards the ouput in the last layer. The channel dimension of the 3D trellis is omitted for clarity.}
+    \caption{Trellis embedding of two seven-layer CNNs. Trellis nodes receiving the input and producing output are encircled. All edges are oriented to the right, down in the first layer, and towards the output in the last layer. The channel dimension of the 3D trellis is omitted for clarity.}
 \end{figure}
 
 \section{Making sense of the Fabrics}
@@ -55,7 +55,7 @@ Each node is connected to a 3 x 3 scale-channel neighborhood in the previous lay
 \paragraph{Re-sampling operators}
 Fine-to-coarse change of the resolution of response maps is done using stride-two convolutions. Larger strides can be obtained by following multiple such edges.
 
-\textit{Average pooling} across small regions is alse strided convolution with uniform filter weights, thus available in the trellis. Average pooling over larger areas is also available.
+\textit{Average pooling} across small regions is also strided convolution with uniform filter weights, thus available in the trellis. Average pooling over larger areas is also available.
 
 \textit{Bi-linear interpolation} is commonly used in deconvolutional networks. Factor-two interpolation can be represented on coarse-to-fine edges by using a filter with $1$ in the center, $1/4$ on corners, and $1/2$ elsewhere. Larger powers of two can be obtained by repetition.
 
@@ -71,14 +71,14 @@ Fine-to-coarse change of the resolution of response maps is done using stride-tw
 A 5 x 5 filter can be implemented by computing nine intermediate channels to obtain a vectorized version of the 3 x 3 neighborhood at each pixel. A second 3 x 3 convolution can then aggregate values across the original 5 x 5 patch, and output the desired convolution. Repetition allows to implement every filter of any desired size.
 
 \paragraph{Ordering convolution and re-sampling}
-It is up to the back-propagation algorithm to choose the desired path(s) to use $-$ by setting all, exept one paths weights to zero, a particular sequence of convolutions and re-sampling operators is obtained.
+It is up to the back-propagation algorithm to choose the desired path(s) to use $-$ by setting all, except one paths weights to zero, a particular sequence of convolutions and re-sampling operators is obtained.
 
 \paragraph{Channel connectivity pattern}
-This sparsely connected among che channel axis trellis suffices to emulate densely connected convolutional layers by copying channels, convolving them, and locally aggregating them.
+This sparsely connected among the channel axis trellis suffices to emulate densely connected convolutional layers by copying channels, convolving them, and locally aggregating them.
 
 
 \section{Principles of modularization}
-The CNF architecture does not contain any standalone modules. The network itself can utilize some of its parts more, and by weight visualization it can be seen as modules being instationed, maybe even for certain purpopes, however they still make up a integral, inseparable part of the network.
+The CNF architecture does not contain any standalone modules. The network itself can utilize some of its parts more, and by weight visualization it can be seen as modules being instationed, maybe even for certain purposes, however they still make up a integral, inseparable part of the network.
 
 \section{Principles of growing}
 The CNF architecture does not allow for any more growing as a conventional (C)NN does. Its purpose is not in growing, but in dynamically utilizing its trellis structure, whilst hiding away multiple hyper-parameters.
