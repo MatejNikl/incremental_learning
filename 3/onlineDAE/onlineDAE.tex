@@ -1,0 +1,56 @@
+\documentclass[a4paper,twocolumn]{article}
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{fullpage}
+\usepackage{titlesec}
+
+\titleformat*{\section}{\large\bfseries}
+\titleformat*{\subsection}{\normalsize\bfseries}
+\let\originalleft\left
+\let\originalright\right
+\renewcommand{\left}{\mathopen{}\mathclose\bgroup\originalleft}
+\renewcommand{\right}{\aftergroup\egroup\originalright}
+
+\title{Online Incremental Feature Learning with Denoising Autoencoders$-$ summary}
+\author{Matěj Nikl}
+
+\begin{document}
+\maketitle
+Determining the optimal model complexity, i.e. the number of features for DAE is a nontrivial problem. Moreover, in large-scale and online datasets the cross-validation method enabling the hyper-parameter search is even more challenging.
+
+This adaptive feature learning algorithm tries to address the given issue by:
+\begin{enumerate}
+    \item adding and training new features to minimize the residual of the objective function
+    \item merging similar features to avoid redundant feature representations
+\end{enumerate}
+Having a variable number of features gives a model the ability to make itself more/less complex according to the (even changing) dataset needs.
+
+\section{Denoising Autoencoder}
+The standard Denoising Autoencoder is used as a building block for incremental feature learning, it consists of four components:
+\begin{itemize}
+    \item a conditional distribution $q(\mathbf{\widetilde{x}|x})$, that corrupts $\mathbf{x}$ into $\mathbf{\widetilde{x}}$
+    \item an encoding function $f(\mathbf{\widetilde{x}}) = \sigma(\mathbf{W\widetilde{x} + b}) \equiv \mathbf{h} \in \mathbb{R}^N$, which gives a representation of input data $\mathbf{x}$
+    \item an decoding function $g(\mathbf{h}) = \sigma(\mathbf{W}^T\mathbf{h + c}) \equiv \mathbf{\widehat{x}} \in \mathbb{R}^D$, which recovers the data from the representation $\mathbf{h}$
+    \item a differentiable (cross-entropy) cost function $\mathcal{L}(\mathbf{x}) = \mathcal{H}(\mathbf{x}, \mathbf{\widehat{x}}) \in \mathbb{R}$, which computes the dissimilarity between input and reconstruction
+\end{itemize}
+
+\section{Incremental Feature Learning}
+The incremental feature learning algorithm needs to address the following problems:
+\begin{enumerate}
+    \item \textit{when} to add and merge features
+    \item \textit{how} to add and merge features
+\end{enumerate}
+In order to deal with these problems, the authors have chosen the following procedure:
+\begin{enumerate}
+    \item form a set $B$ of hard training examples: $B \leftarrow B \cup \{\textbf{x}\}$ if $\mathcal{L}(\textbf{x}) > \mu$, which is used to greedily initialize the new features
+    \item train and add new features when there are enough examples in $B$: $|B| > \tau$
+\end{enumerate}
+In this paper $\mu$ was set as average of the objective function for recent $10000$ examples, $\tau$ was also set as 10000.
+
+
+\end{document}
