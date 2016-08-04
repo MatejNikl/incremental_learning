@@ -3,7 +3,6 @@
 \usepackage[english]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage{graphicx}
-\usepackage{caption}
 
 \newenvironment{Figure}
   {\par\medskip\noindent\minipage{\linewidth}}
@@ -14,6 +13,7 @@
 
 \begin{document}
 \maketitle
+\noindent
 This paper tries to address the task of (visual) question answering. One might try to approach this problem with a single, monolithic, deep NN, which would somehow try to answer all possible questions about all possible images (or \textit{worlds} as they are called in general). Authors of this paper, however, tried to tackle this problem in a different way. Take for example a question ``What is in the sheep's ear?''. It can be broken down into smaller subtasks/processing steps:
     \begin{enumerate}
         \item Find sheep
@@ -23,18 +23,14 @@ This paper tries to address the task of (visual) question answering. One might t
     \end{enumerate}
 Those subtasks arise in every question because of the compositional nature of language.
 
-    \begin{Figure}
-        \centering
-        \frame{\includegraphics[width=0.4\textwidth]{sheep.png}}
-        \frame{\includegraphics[width=0.4\textwidth]{bird.png}}
-        \captionof{figure}{Examples of network instances and their computation processes}
-    \end{Figure}
-
+\begin{figure}
+    \centering
+    \frame{\includegraphics[width=0.35\columnwidth]{sheep.png}}
+    \frame{\includegraphics[width=0.35\columnwidth]{bird.png}}
+    \caption{Examples of network instances and their computation processes}
+\end{figure}
 Applying these operations would lead to the correct answer. Thus, it was proposed to use such modules that would compute simpler operations and compose them for each question in a way that would lead to a correct answer. This gives a rise to a few more problems to solve:
 
-\subsection*{Principles of modularization}
-\subsection*{Principles of growing}
-NEKAM TYHLE SEKCE VECPAT OMG
 \subsubsection*{Module types}
 It is needed to hand-craft general module types (and their purposes) to fit the needs of the problem given. Following module types were proposed for the task of (V)QA:
     \begin{itemize}
@@ -66,4 +62,7 @@ For each question a network is built and used for a label (answer) prediction.  
     The proposed approach is to perform a syntactic parse on the question to generate a small set of layout candidates. To choose the best one, all layouts need to be scored. For that a LSTM representation of the question, as well as a feature-based representation of the layout being scored, are produced and passed through a MLP. The layout feature vector includes indicators of the number of modules of each type present and their arguments (e.g. that a find module is looking for a dog).
  However, choosing the best layout is non-differentiable, thus reinforcement learning needs to be used to train the scoring MLP.
 
+\subsection*{Principles of modularization}
+\subsection*{Principles of growing}
+NEKAM TYHLE SEKCE VECPAT OMG
 \end{document}
