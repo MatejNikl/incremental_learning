@@ -5,10 +5,15 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{fullpage}
-\usepackage{titlesec}
+\usepackage[small]{titlesec}
 
-\titleformat*{\section}{\large\bfseries}
-\titleformat*{\subsection}{\normalsize\bfseries}
+% patch titlesec bug of not showing (sub)title numbering http://tex.stackexchange.com/a/300259
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd{\ttlh@hang}{\parindent\z@}{\parindent\z@\leavevmode}{}{}
+\patchcmd{\ttlh@hang}{\noindent}{}{}{}
+\makeatother
+
 
 \newcommand*\mean[1]{\overline{#1}}
 
@@ -17,8 +22,8 @@
 
 \begin{document}
 \maketitle
+\noindent
 The Cascade-Correlation Architecture (CCA) is a architecture as well as a supervised learning algorithm for artificial neural networks (ANNs). Conventional way of training ANNs is to \textit{somehow} choose a fixed network topology and then train it using back-propagation algorithm.
-
 CCA eliminates the need of choosing a fixed network topology and provides a way of training this kind of a dynamic network.
 
 \section{Principles of growing}

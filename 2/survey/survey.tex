@@ -2,13 +2,8 @@
 
 \usepackage[english]{babel}
 \usepackage[utf8]{inputenc}
-\usepackage{fullpage}
-\usepackage{titlesec}
+\usepackage[cm]{fullpage}
 \usepackage{amsmath}
-
-\titleformat*{\section}{\large\bfseries}
-\titleformat*{\subsection}{\normalsize\bfseries}
-\titleformat*{\subsubsection}{\small\bfseries}
 
 \newcommand{\D}{\mathcal{D}}
 \newcommand{\T}{\mathcal{T}}
@@ -22,6 +17,7 @@
 
 \begin{document}
 \maketitle
+\noindent
 As the title suggests, this paper focuses on transfer learning.
 A few definitions:
 
@@ -49,7 +45,6 @@ A few definitions:
             \item when $\D_S = \D_T$ and $\T_S = \T_T$, the learning problem becomes a traditional machine learning problem
         \end{itemize}
 \end{itemize}
-
 In other words, transfer learning aims to extract a knowledge from one or more source tasks (and their domains) and applies the knowledge to a target task.
 
 One should not confuse transfer learning with multi-task learning $-$ multi-task learning tries to learn all of the source and target tasks simultaneously (thus treating them all equally), transfer learning cares the most about the target task.
@@ -60,7 +55,6 @@ There are three main research issues:
     \item \textbf{How} to transfer $-$ learning algorithms need to be developed to transfer the knowledge
     \item \textbf{When} to transfer $-$ in which situations should transferring be done as well as in which it should not be done $-$ when source and target domains are not related to each other, transferring the knowledge may even hurt the performance $-$ a phenomenon called \textit{negative transfer}
 \end{enumerate}
-
 Based on the definition of transfer learning, its relationship can be summarized into three sub-settings:
 
 \begin{enumerate}
@@ -96,7 +90,6 @@ Based on the definition of transfer learning, its relationship can be summarized
             \item the predicted labels are latent variables, such as clusters or reduced dimensions
         \end{itemize}
 \end{enumerate}
-
 Approaches to the above three different settings can be summarized into four cases based on what to transfer:
 
 \begin{enumerate}
@@ -158,23 +151,22 @@ Another approach on this task is based on a form of second-order Markov logic $-
 \subsection{Transferring Knowledge of Instances}
 Most approaches are motivated by importance sampling. We can learn the optimal parameters $\theta$ by minimizing the empirical risk (ERM):
 
-\[
+\begin{equation}
     \theta = \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_T} P(D_T)l(x, y, \theta)
-\]
+\end{equation}
 
 However, since no labeled data in $D_T$ are observed and $P(D_S) = P(D_T)$, we may simply learn the model:
-\[
+\begin{equation}
     \theta = \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_S} P(D_S)l(x, y, \theta)
-\]
+\end{equation}
 
 If $P(D_S) \ne P(D_T)$:
 
-\begin{align*}
+\begin{align}
     \theta &= \argmin_{\theta \in \Theta} \sum_{(x,y) \in D_S} \frac{P(D_T)}{P(D_S)}P(D_S)l(x, y, \theta) \\
            &\approx \argmin_{\theta \in \Theta} \sum_{i = 1}^{n_S} \frac{P_T(x_{T_i}, y_{T_i})}{P_S(x_{S_i}, y_{S_i})}l(x, y, \theta) \\
            &= \argmin_{\theta \in \Theta} \sum_{i = 1}^{n_S} \frac{P(x_{S_i})}{P(x_{T_i})}l(x, y, \theta)
-\end{align*}
-
+\end{align}
 Last simplification comes from $P(Y_S|X_S) = P(Y_T|X_T)$, thus the difference between $P(D_S)$ and $P(D_T)$ is caused by $P(X_S)$ and $P(X_T)$, hence the simplification. The remaining problem is the estimation of $\frac{P(x_{S_i})}{P(x_{T_i})}$.
 
 Various ways to estimate the fraction exist. One way is to estimate the terms independently by constructing simple classification problems. The other way is to estimate the probability ratio directly:
