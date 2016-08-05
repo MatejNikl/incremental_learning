@@ -6,20 +6,35 @@
 \usepackage{hyperref}
 \usepackage{amsmath}
 \usepackage{fullpage}
-\usepackage{titlesec}
 
-\titleformat*{\section}{\large\bfseries}
-\titleformat*{\subsection}{\normalsize\bfseries}
+\usepackage[small]{titlesec}
+% patch titlesec bug of not showing (sub)title numbering http://tex.stackexchange.com/a/300259
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd{\ttlh@hang}{\parindent\z@}{\parindent\z@\leavevmode}{}{}
+\patchcmd{\ttlh@hang}{\noindent}{}{}{}
+\makeatother
+
 \let\originalleft\left
 \let\originalright\right
 \renewcommand{\left}{\mathopen{}\mathclose\bgroup\originalleft}
 \renewcommand{\right}{\aftergroup\egroup\originalright}
+
+\newcommand{\ar}{\rightarrow}
+
+\makeatletter
+\newcommand{\thickhline}{%
+    \noalign {\ifnum 0=`}\fi \hrule height 1pt
+    \futurelet \reserved@a \@xhline
+}
+\makeatother
 
 \title{Learning without Forgetting $-$ summary}
 \author{Matěj Nikl}
 
 \begin{document}
 \maketitle
+\noindent
 This paper is about a method called Learning without Forgetting (LwF), which focuses on the task of incremental learning of new capabilities without forgetting the old ones. On top of that, this method can accomplish this task without the need for the training data the old capabilities were trained with.
 
 It resembles the combination of \textit{Knowledge Distilling} and transfer learning strategy \textit{fine-tuning}.
@@ -70,13 +85,39 @@ For each new task a new output layer $\theta_n$ is crated. The whole set of para
 
 
 \begin{figure*}[t]
-    \includegraphics[width=\textwidth]{table.png}
-    \caption{Relative advantages of the LwF method compared to other commonly used methods.}
-    \label{fig:table}
-\end{figure*}
-\begin{figure*}[t]
-    \includegraphics[width=\textwidth]{methods.png}
+    \centering
+    \includegraphics[width=0.6\textwidth]{methods.png}
     \caption{Illustration of LwF method (e) and other methods (b-d).}
     \label{fig:methods}
+\end{figure*}
+{
+\renewcommand{\arraystretch}{1.25}
+\begin{table*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+    \begin{tabular}{r *{20}{c}}
+        \thickhline
+                         & \multicolumn{2}{c}{ImageNet$\ar$VOC} && \multicolumn{2}{c}{ImageNet$\ar$CUB} && \multicolumn{2}{c}{ImageNet$\ar$Scenes} && \multicolumn{2}{c}{Places2$\ar$VOC} && \multicolumn{2}{c}{Places2$\ar$CUB} && \multicolumn{2}{c}{Places2$\ar$Scenes} && \multicolumn{2}{c}{ImageNet$\ar$MNIST} \\
+                         \cline{2-3} \cline{5-6} \cline{8-9} \cline{11-12} \cline{14-15} \cline{17-18} \cline{20-21}
+                         & old  & new  && old  & new  && old  & new  && old  & new  && old  & new   && old  & new  && old  & new   \\
+        \hline
+        LwF (ours)       & 56.5 & 75.8 && 55.1 & 57.5 && 55.9 & 64.5 && 43.3 & 72.1 && 38.4 & 41.7  && 43.0 & 75.3 && 52.1 & 99.0 \\
+        \hline
+        fine-tuning      & -1.4 & -0.3 && -5.1 & -1.5 && -3.4 & -1.0 && -1.8 & -0.1 && -9.1 & -0.8  && -4.1 & -0.8 && -4.9 & 0.2 \\
+        feat. extraction & 0.5  & -1.1 && 2.0  & -5.3 && 1.2  & -3.7 && -0.2 & -3.9 && 4.7  & -19.4 && 0.2  & -0.5 && 5.0  & -0.8 \\
+        \hline
+        joint training   & 0.2  & 0.0  && 0.5  & -0.9 && 0.5  & -0.6 && -0.1 & 0.1  && 3.3  & -0.2  && 0.2  & 0.1  && 4.7  & 0.2 \\
+        \thickhline
+    \end{tabular}}
+    \caption{Performance for the single new task scenario using AlexNet structure. The difference
+    of methods’ performance with LwF is reported to facilitate comparison.}
+\end{table*}
+}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{gradual.png}
+    \caption{Performance of each task when gradually adding new tasks to a pre-trained network. The $x$-axis labels indicate the new task added to the network each time. Error bars shows $\pm2$ standard deviations for 3 runs with different $\theta_n$ random initializations. Markers are jittered horizontally for visualization, but line plots are not jittered to facilitate comparison.}
+    \label{fig:table}
 \end{figure*}
 \end{document}

@@ -5,10 +5,13 @@
 \usepackage{graphicx}
 \usepackage{fullpage}
 
-\usepackage{titlesec}
-
-\titleformat*{\section}{\large\bfseries}
-\titleformat*{\subsection}{\normalsize\bfseries}
+\usepackage[small]{titlesec}
+% patch titlesec bug of not showing (sub)title numbering http://tex.stackexchange.com/a/300259
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd{\ttlh@hang}{\parindent\z@}{\parindent\z@\leavevmode}{}{}
+\patchcmd{\ttlh@hang}{\noindent}{}{}{}
+\makeatother
 
 
 \title{Distilling the Knowledge in a Neural Network $-$ summary}
@@ -16,6 +19,7 @@
 
 \begin{document}
 \maketitle
+\noindent
 A process called \textit{distillation} is a kind of learning that can be used to transfer a knowledge from a cumbersome model (or an ensemble of models) to a smaller/single model, which is more suitable for deployment, while preserving the knowledge and thus preserving the performance.
 
 To do so, the standard back-propagation algorithm (with a different objective function) is used.
