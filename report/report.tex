@@ -1,0 +1,71 @@
+\documentclass[a4paper]{article}
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[super]{nth}
+% \usepackage{graphicx}
+\usepackage{fullpage}
+% \pagenumbering{gobble}
+
+\title{Incremental Learning $-$ GoodAI}
+\author{Matěj Nikl}
+
+\begin{document}
+\maketitle
+
+% \begin{abstract}
+%     Incremental learning yolo
+% \end{abstract}
+
+\section{Project Description}
+The project's main goal is to think of and implement a machine learning
+algorithm with the incremental learning feature, i.e. a model trained on a \nth{1}
+task should be able to use the gained knowledge to converge on a \nth{2} task faster
+(without forgetting the \nth{1} task), compared to a model learning the \nth{2}
+task from scratch.
+
+It will be demonstrated on a set of different tasks in very similar domains
+(small noisy images with shapes in them).
+
+\section{Work in July}
+To gain some insight of what has been done in this area and to have a foundation
+to build on top off I have read, understood and summarized into a (usually)
+2 page long summaries these research papers:
+
+\begin{itemize}
+    \item \textbf{Learning to Compose Neural Networks for Question Answering},
+        2016 $-$ neural network modules being arranged into a tree-like
+        structure for each question to answer it correctly
+    \item \textbf{Neural Module Networks}, 2016 $-$ preliminary work of the
+        previous paper
+    \item \textbf{Progressive Neural Networks}, 2016 $-$ neural networks
+        tackling the problem of transferring the knowledge without forgetting
+        from previously learned tasks to a new one (incremental learning)
+    \item \textbf{A Survey on Transfer Learning}, 2009
+    \item \textbf{The Cascade-Correlation Learning Architecture}, 1990
+        $-$ a dynamic architecture, creating a \textit{cascade} of neurons and
+        greedily training them, without the need to specify the network's
+        topology
+    \item \textbf{Convolutional Neural Fabrics}, 2016 $-$ a complex 3D
+        trellis-like convolutional structure, embedding an exponentially large
+        number of CNN architectures (via massive parameter sharing), allowing
+        for choosing the correct one (or even ensemble of them) by standard
+        back-propagation algorithm
+    \item \textbf{Distilling the Knowledge in a Neural Network}, 2015 $-$ a way
+        of transferring the knowledge from a cumbersome model (or an ensemble of
+        models) to a smaller model, while preserving the performance
+    \item \textbf{Learning Without Forgetting}, 2016 $-$ an incremental learning
+        of new tasks without forgetting the old ones, using the distillation and
+        fine-tuning
+    \item \textbf{Online Incremental Feature Learning with Denoising Autoencoders},
+        2012 $-$ a shallow DAE dynamically adjusting its hidden layer's size
+        to perform well on a (online) dataset
+\end{itemize}
+
+\section{Work in August}
+The project's goal should be fulfilled in this month by implementing a
+experimental version of a machine learning algorithm with the incremental
+learning feature. A detailed explanation of the implemented algorithm is required
+as well, so that anybody is able to understand it properly.
+
+\end{document}
