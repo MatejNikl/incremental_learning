@@ -4,3 +4,5 @@
 .*.sw*
 *.eps
 *.out
+*.zip
+task/archive/
