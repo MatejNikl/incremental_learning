@@ -195,6 +195,7 @@ engine.hooks.onForwardCriterion = function(state)
     end
 end
 
+local visualize_window
 engine.hooks.onEndEpoch = function(state)
     state.iterator:exec('resample') -- call :resample() on the underlying dataset
 
@@ -208,7 +209,7 @@ engine.hooks.onEndEpoch = function(state)
             end
         end
 
-        _G.visualize_window = image.display{
+        visualize_window = image.display{
             image = parameters,
             zoom  = 2,
             win   = visualize_window
