@@ -1,9 +1,10 @@
 local sig   = require 'signal'
 
-local image = require 'image'
-local nn    = require 'nn'
-local optim = require 'optim'
-local tnt   = require 'torchnet'
+local argcheck = require 'argcheck'
+local image    = require 'image'
+local nn       = require 'nn'
+local optim    = require 'optim'
+local tnt      = require 'torchnet'
 
 
 local function parse_args(args)
@@ -141,6 +142,23 @@ local function create_net(opts)
     return net
 end
 
+local print_acc = argcheck{
+    {name='avgloss', type='tnt.AverageValueMeter', help='average loss'},
+    {name='apmeter', type='tnt.APMeter', help='precision per class'},
+    call =
+        function(avgloss, apmeter)
+            local str = string.format('avg. loss: %2.10f, precision per class:',
+                avgloss:value())
+            local val = apmeter:value()
+
+            for i = 1, val:nElement() do
+                str = str .. string.format(' %7.3f%%', val[i] * 100)
+            end
+
+            print(str)
+        end
+}
+
 sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
@@ -165,18 +183,15 @@ local avgloss = tnt.AverageValueMeter()
 engine.hooks.onStartEpoch = function(state)
     avgloss:reset()
     apmeter:reset()
+    print("Epoch: " .. state.epoch)
 end
 
 engine.hooks.onForwardCriterion = function(state)
     avgloss:add(state.criterion.output)
     apmeter:add(state.network.output, state.sample.target)
+
     if state.training then
-        local str = string.format('avg. loss: %2.10f, precision per class:', avgloss:value())
-        local val = apmeter:value()
-        for i = 1, val:nElement() do
-            str = str .. string.format(' %7.3f%%', val[i] * 100)
-        end
-        print(str)
+        print_acc(avgloss, apmeter)
     end
 end
 
@@ -225,8 +240,9 @@ engine:test{
     criterion = criterion,
 }
 
-print(string.format('avg. loss: %2.10f', avgloss:value()))
-print(apmeter:value())
+
+print("Stats on the test set:")
+print_acc(avgloss, apmeter)
 
 
 -- for data in test_dataset:iterator()() do
