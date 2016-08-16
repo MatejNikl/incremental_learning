@@ -1,3 +1,5 @@
+local sig   = require 'signal'
+
 local image = require 'image'
 local nn    = require 'nn'
 local optim = require 'optim'
@@ -139,6 +141,8 @@ local function create_net(opts)
     return net
 end
 
+sig.signal(sig.SIGINT, sig.signal_handler)
+
 local opts, args = parse_args(_G.arg)
 
 local train_dataset = torch.load(opts.train_path)
@@ -162,6 +166,7 @@ engine.hooks.onStartEpoch = function(state)
     avgloss:reset()
     apmeter:reset()
 end
+
 engine.hooks.onForwardCriterion = function(state)
     avgloss:add(state.criterion.output)
     apmeter:add(state.network.output, state.sample.target)
@@ -193,6 +198,10 @@ engine.hooks.onEndEpoch = function(state)
             zoom  = 2,
             win   = visualize_window
         }
+    end
+
+    if _G.interrupted then
+        state.maxepoch = 0 -- end training
     end
 end
 
