@@ -9,53 +9,45 @@ local xlua = require 'xlua' -- opts parser, progress bar
 
 
 local function parse_args(args)
-    local op = xlua.OptionParser("dataset_creator.lua -c|--csv=CSV -d|--dir=DIR"
-        .. "[-p|--pattern ptrn] OUTPUT_FILE")
+    local op = xlua.OptionParser("dataset_creator.lua --csv=CSV --dir=DIR"
+        .. "[--mean=MEAN --std=STD --dont-care=VAL --pattern=PTRN] OUTPUT_FILE")
 
     op:option{
-        "-c",
         "--csv",
-        action = "store",
         dest   = "csv",
-        help   = "a csv file"
+        help   = "a csv file",
     }
 
     op:option{
-        "-d",
         "--dir",
-        action = "store",
         dest   = "dir",
-        help   = "a directory containing images"
+        help   = "a directory containing images",
     }
 
     op:option{
         "--mean",
-        action  = "store",
         dest    = "mean",
         help    = "a mean to subtract from inputs",
     }
 
     op:option{
         "--std",
-        action  = "store",
         dest    = "std",
         help    = "a std to divide the inputs with",
     }
 
     op:option{
         "--dont-care",
-        action  = "store",
+        default = 2,
         dest    = "dont_care",
         help    = "a target value not cared about",
-        default = 2
     }
 
     op:option{
         "--pattern",
-        action  = "store",
         dest    = "pattern",
         help    = "a (simple) glob pattern to match",
-        default = "*.png"
+        default = "*.png",
     }
 
 
@@ -129,7 +121,7 @@ for fn in lfs.dir(opts.dir) do
             error("All targets must have the same size!")
         end
 
-        table.insert(input_table, input:view(input:nElement())) -- 1x32x32 --> 1024
+        table.insert(input_table, input:view(input:nElement())) -- 1x64x64 --> 4096
         table.insert(target_table, target)
     end
 
