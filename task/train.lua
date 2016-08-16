@@ -123,13 +123,12 @@ local function create_net(opts)
             net:add(nn.LinearDropconnect(nprev, ncurr, opts.dropconnect))
         end
 
+        if opts.batchnorm then
+            net:add(nn.BatchNormalization(ncurr))
+        end
 
         if i < #opts.layers then
             net:add(nn[opts.act]())
-
-            if opts.batchnorm then
-                net:add(nn.BatchNormalization(ncurr))
-            end
         else
             net:add(nn.Sigmoid())
         end
