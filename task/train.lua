@@ -8,8 +8,8 @@ local tnt      = require 'torchnet'
 
 
 local function parse_args(args)
-    local op = xlua.OptionParser("dataset_creator.lua -c|--csv=CSV -d|--dir=DIR"
-        .. "[-p|--pattern ptrn] OUTPUT_FILE")
+    local op = xlua.OptionParser("train.lua --train TRAIN_DATASET"
+        .. " --test TEST_DATASET [OPTIONS...]")
 
     op:option{
         "--train",
@@ -58,7 +58,7 @@ local function parse_args(args)
         action  = "store_true",
         default = false,
         dest    = "batchnorm",
-        help    = "batch normalization",
+        help    = "use batch normalization before each activation",
     }
 
     op:option{
@@ -98,6 +98,7 @@ local function parse_args(args)
         op:fail("The testing dataset file must exit!")
     end
 
+    opts.batch_size = tonumber(opts.batch_size)
     opts.dropout = tonumber(opts.dropout)
     opts.dropconnect = tonumber(opts.dropconnect)
     opts.layers = loadstring("return {" .. opts.layers .. "}")()
