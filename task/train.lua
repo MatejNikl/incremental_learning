@@ -6,6 +6,7 @@ local nn       = require 'nn'
 local optim    = require 'optim'
 local tnt      = require 'torchnet'
 
+require 'dropconnect'
 
 local function parse_args(args)
     local op = xlua.OptionParser("train.lua --train TRAIN_DATASET"
@@ -13,22 +14,26 @@ local function parse_args(args)
 
     op:option{
         "--train",
-        dest   = "train_path",
-        help   = "a file containing training data",
-        req    = true,
+        dest = "train_path",
+        help = "a file containing training data",
     }
 
     op:option{
         "--test",
-        dest   = "test_path",
-        help   = "a file containing testing data",
-        req    = true,
+        dest = "test_path",
+        help = "a file containing testing data",
     }
 
     op:option{
         "--visual-check",
         dest = "visual_check",
         help = "after training show input images one by one + the net's responses",
+    }
+
+    op:option{
+        "--use-net",
+        dest = "use_net",
+        help = "a file containing a previously saved nn",
     }
 
     op:option{
@@ -98,14 +103,16 @@ local function parse_args(args)
 
     local opts, args = op:parse()
 
-    if not paths.filep(opts.train_path) then
+    if opts.train_path and not paths.filep(opts.train_path) then
         op:fail("The training dataset file must exist!")
-    elseif not paths.filep(opts.test_path) then
+    elseif opts.test_path and not paths.filep(opts.test_path) then
         op:fail("The testing dataset file must exit!")
+    elseif opts.use_net and not paths.filep(opts.use_net) then
+        op:fail("The file containing previously saved nn must exit!")
     end
 
-    opts.batch_size = tonumber(opts.batch_size)
-    opts.dropout = tonumber(opts.dropout)
+    opts.batch_size  = tonumber(opts.batch_size)
+    opts.dropout     = tonumber(opts.dropout)
     opts.dropconnect = tonumber(opts.dropconnect)
     opts.layers = loadstring("return {" .. opts.layers .. "}")()
 
@@ -114,10 +121,6 @@ end
 
 local function create_net(opts)
     local net = nn.Sequential()
-
-    if opts.dropconnect > 0 then
-        require 'dropconnect'
-    end
 
     for i = 2, #opts.layers do
         local nprev = opts.layers[i-1]
@@ -177,13 +180,19 @@ sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
 
-local train_dataset = torch.load(opts.train_path)
-local test_dataset  = torch.load(opts.test_path)
+local train_dataset = opts.train_path and torch.load(opts.train_path) or nil
+local test_dataset  = opts.test_path and torch.load(opts.test_path) or nil
 
-table.insert(opts.layers, 1, train_dataset:get(1).input:nElement())
-table.insert(opts.layers, train_dataset:get(1).target:nElement())
+local net
+if opts.use_net then
+    net = torch.load(opts.use_net)
+    print("Loaded a nn from the file '" .. opts.use_net .. "'")
+else
+    table.insert(opts.layers, 1, train_dataset:get(1).input:nElement())
+    table.insert(opts.layers, train_dataset:get(1).target:nElement())
+    net = create_net(opts)
+end
 
-local net = create_net(opts)
 print(net)
 
 
@@ -256,48 +265,55 @@ engine.hooks.onEndEpoch = function(state)
 end
 
 
--- train the model:
-engine:train{
-    network     = net,
-    iterator    = train_dataset:shuffle():batch(opts.batch_size):iterator(),
-    criterion   = criterion,
-    optimMethod = optim[opts.optim],
-    maxepoch    = 100,
-}
+if opts.train_path then
+    -- train the model:
+    engine:train{
+        network     = net,
+        iterator    = train_dataset:shuffle():batch(opts.batch_size):iterator(),
+        criterion   = criterion,
+        optimMethod = optim[opts.optim],
+        maxepoch    = 100,
+    }
+end
 
--- measure test loss and error:
-avgloss:reset()
-apmeter:reset()
+if opts.test_path then
+    -- measure test loss and error:
+    avgloss:reset()
+    apmeter:reset()
 
-engine:test{
-    network   = net,
-    iterator  = test_dataset:batch(100):iterator(),
-    criterion = criterion,
-}
+    engine:test{
+        network   = net,
+        iterator  = test_dataset:batch(test_dataset:size()):iterator(),
+        criterion = criterion,
+    }
 
-log:status("Stats on the test set:")
-log:set{
-    loss      = avgloss:value(),
-    accuracy  = apmeter:value():mean() * 100,
-    per_class = apmeter:strvalue(),
-}
-log:flush()
+    log:status("Stats on the test set:")
+    log:set{
+        loss      = avgloss:value(),
+        accuracy  = apmeter:value():mean() * 100,
+        per_class = apmeter:strvalue(),
+    }
+    log:flush()
+
+    if opts.visual_check then
+        local w
+        for data in test_dataset:iterator()() do
+            w = image.display{image=data.input:view(1, 64, 64), win = w}
+            local a = net:forward(data.input):squeeze()
+            local b = data.target
+            a = torch.cat(a, a:ge(0.5):double(), 2)
+            print(torch.cat(a, b, 2):t())
+            print("Press enter to load next example...")
+            io.read()
+
+            if _G.interrupted then break end
+        end
+    end
+end
 
 if #args > 0 then
     torch.save(args[1], net:clearState())
     print("Saved the trained network as '" .. args[1] .. "'")
 end
 
-if opts.visual_check then
-    local w
-    for data in test_dataset:iterator()() do
-        w = image.display{image=data.input:view(1, 64, 64), win = w}
-        local a = net:forward(data.input):squeeze()
-        local b = data.target
-        a = torch.cat(a, a:ge(0.5):double(), 2)
-        print(torch.cat(a, b, 2):t())
-        print("Press enter to load next example...")
-        io.read()
-    end
-end
-
+if visualize_window then visualize_window.window:close() end
