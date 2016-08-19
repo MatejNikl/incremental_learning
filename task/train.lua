@@ -230,16 +230,21 @@ engine.hooks.onForwardCriterion = function(state)
 
     if opts.visualize then
         local parameters
+        local nunits
         for _, module in ipairs(net.modules) do
             if module.__typename == "nn.Linear"
             or module.__typename == "nn.LinearDropconnect" then
-                parameters = module.weight:view(opts.layers[2], 64, 64)
+                nunits     = module.weight:size(1)
+                parameters = module.weight:view(nunits, 64, 64)
                 break
             end
         end
 
         visualize_window = image.display{
-            image = parameters,
+            image = image.toDisplayTensor{
+                input   = parameters,
+                nrow    = 10,
+                padding = 1},
             zoom  = 2,
             win   = visualize_window
         }
