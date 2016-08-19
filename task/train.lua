@@ -26,6 +26,12 @@ local function parse_args(args)
     }
 
     op:option{
+        "--visual-check",
+        dest = "visual_check",
+        help = "after training show input images one by one + the net's responses",
+    }
+
+    op:option{
         "--optim",
         default = "adam",
         dest    = "optim",
@@ -282,12 +288,16 @@ if #args > 0 then
     print("Saved the trained network as '" .. args[1] .. "'")
 end
 
--- for data in test_dataset:iterator()() do
---     w = image.display{image=data.input:view(1, 64, 64), win = w}
---     local a = net:forward(data.input):squeeze()
---     local b = data.target
---     a = torch.cat(a, a:ge(0.5):double(), 2)
---     print(torch.cat(a, b, 2):t())
---     io.read()
--- end
+if opts.visual_check then
+    local w
+    for data in test_dataset:iterator()() do
+        w = image.display{image=data.input:view(1, 64, 64), win = w}
+        local a = net:forward(data.input):squeeze()
+        local b = data.target
+        a = torch.cat(a, a:ge(0.5):double(), 2)
+        print(torch.cat(a, b, 2):t())
+        print("Press enter to load next example...")
+        io.read()
+    end
+end
 
