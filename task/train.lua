@@ -9,7 +9,7 @@ local tnt      = require 'torchnet'
 
 local function parse_args(args)
     local op = xlua.OptionParser("train.lua --train TRAIN_DATASET"
-        .. " --test TEST_DATASET [OPTIONS...]")
+        .. " --test TEST_DATASET [OPTIONS...] SAVE_NET.t7")
 
     op:option{
         "--train",
@@ -276,6 +276,11 @@ log:set{
     per_class = apmeter:strvalue(),
 }
 log:flush()
+
+if #args > 0 then
+    torch.save(args[1], net:clearState())
+    print("Saved the trained network as '" .. args[1] .. "'")
+end
 
 -- for data in test_dataset:iterator()() do
 --     w = image.display{image=data.input:view(1, 64, 64), win = w}
