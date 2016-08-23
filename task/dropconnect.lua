@@ -6,13 +6,15 @@
    Dept. of Computer Science, Courant Institute of Mathematical Science, New York University
 
    Implemented by John-Alexander M. Assael (www.johnassael.com), 2015
+   Further modified by Matej Nikl, 2016
 
 ]]--
 
 local LinearDropconnect, parent = torch.class('nn.LinearDropconnect', 'nn.Linear')
 
-function LinearDropconnect:__init(inputSize, outputSize, p)
+function LinearDropconnect:__init(inputSize, outputSize, p, bias)
 
+   local bias = ((bias == nil) and true) or bias
    self.train = true
 
    self.p = p or 0.5
@@ -21,11 +23,15 @@ function LinearDropconnect:__init(inputSize, outputSize, p)
    end
 
    self.noiseWeight = torch.Tensor(outputSize, inputSize)
-   self.noiseBias = torch.Tensor(outputSize)
+   if bias then self.noiseBias = torch.Tensor(outputSize) end
 
-   parent.__init(self, inputSize, outputSize)
+   parent.__init(self, inputSize, outputSize, bias)
 end
 
+function LinearDropconnect:noBias()
+   self.noiseBias = nil
+   return parent.noBias(self)
+end
 
 function LinearDropconnect:reset(stdv)
    if stdv then
@@ -38,15 +44,15 @@ function LinearDropconnect:reset(stdv)
          self.weight:select(1, i):apply(function()
             return torch.uniform(-stdv, stdv)
          end)
-         self.bias[i] = torch.uniform(-stdv, stdv)
+         if self.bias then self.bias[i] = torch.uniform(-stdv, stdv) end
       end
    else
       self.weight:uniform(-stdv, stdv)
-      self.bias:uniform(-stdv, stdv)
+      if self.bias then self.bias:uniform(-stdv, stdv) end
    end
 
    self.noiseWeight:fill(1)
-   self.noiseBias:fill(1)
+   if self.noiseBias then self.noiseBias:fill(1) end
 
    return self
 end
@@ -56,22 +62,32 @@ function LinearDropconnect:updateOutput(input)
    -- Dropconnect
    if self.train then
       self.noiseWeight:bernoulli(1-self.p):cmul(self.weight)
-      self.noiseBias:bernoulli(1-self.p):cmul(self.bias)
+      if self.noiseBias then
+         self.noiseBias:bernoulli(1-self.p):cmul(self.bias)
+      end
    end
 
    if input:dim() == 1 then
-      self.output:resize(self.bias:size(1))
+      self.output:resize(self.weight:size(1))
       if self.train then
-         self.output:copy(self.noiseBias)
+         if self.noiseBias then
+            self.output:copy(self.noiseBias)
+         else
+            self.output:zero()
+         end
          self.output:addmv(1, self.noiseWeight, input)
       else
-         self.output:copy(self.bias)
+         if self.bias then
+            self.output:copy(self.bias)
+         else
+            self.output:zero()
+         end
          self.output:addmv(1, self.weight, input)
       end
    elseif input:dim() == 2 then
       local nframe = input:size(1)
       local nElement = self.output:nElement()
-      self.output:resize(nframe, self.bias:size(1))
+      self.output:resize(nframe, self.weight:size(1))
       if self.output:nElement() ~= nElement then
          self.output:zero()
       end
@@ -81,10 +97,14 @@ function LinearDropconnect:updateOutput(input)
       end
       if self.train then
          self.output:addmm(0, self.output, 1, input, self.noiseWeight:t())
-         self.output:addr(1, self.addBuffer, self.noiseBias)
+         if self.noiseBias then
+            self.output:addr(1, self.addBuffer, self.noiseBias)
+         end
       else
          self.output:addmm(0, self.output, 1, input, self.weight:t())
-         self.output:addr(1, self.addBuffer, self.bias)
+         if self.bias then
+            self.output:addr(1, self.addBuffer, self.bias)
+         end
       end
    else
       error('input must be vector or matrix')
