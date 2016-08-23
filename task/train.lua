@@ -26,8 +26,9 @@ local function parse_args(args)
 
    op:option{
       "--visual-check",
-      dest = "visual_check",
-      help = "after training show input images one by one + the net's responses",
+      action = "store_true",
+      dest   = "visual_check",
+      help   = "after training show input images one by one + the net's responses",
    }
 
    op:option{
@@ -303,6 +304,7 @@ if opts.test_path then
 
    if opts.visual_check then
       local w
+      _G.interrupted = nil
       for data in test_dataset:iterator()() do
          w = image.display{image=data.input:view(1, 64, 64), win = w}
          local a = net:forward(data.input):squeeze()
