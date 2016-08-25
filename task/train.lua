@@ -276,7 +276,7 @@ local visualize_window
 
 engine.hooks.onStart = function(state)
    if opts.visualize then
-      visualize_window = visualize_layer(net.modules, visualize_window)
+      visualize_window = visualize_layer(state.network.modules, visualize_window)
    end
 end
 
@@ -296,7 +296,7 @@ engine.hooks.onEndEpoch = function(state)
 
    train_dataset:select('valid')
    engine:test{
-      network   = net,
+      network   = state.network,
       iterator  = train_dataset:batch(train_dataset:size()):iterator(),
       criterion = criterion,
    }
@@ -309,8 +309,9 @@ engine.hooks.onEndEpoch = function(state)
    }
    log:flush()
 
+
    if opts.visualize then
-      visualize_window = visualize_layer(net.modules, visualize_window)
+      visualize_window = visualize_layer(state.network.modules, visualize_window)
    end
 
    if _G.interrupted then
