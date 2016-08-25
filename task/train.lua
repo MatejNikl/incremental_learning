@@ -168,6 +168,7 @@ local logkeys = {
    'train_acc',
    'valid_loss',
    'valid_acc',
+   'epoch_time',
 }
 
 local logtext   = require 'torchnet.log.view.text'
@@ -175,7 +176,7 @@ local logstatus = require 'torchnet.log.view.status'
 
 local lossfmt = '%10.8f'
 local accfmt  = '%7.3f%%'
-local format  = {'%4d', lossfmt, accfmt, lossfmt, accfmt}
+local format  = {'%4d', lossfmt, accfmt, lossfmt, accfmt, '%7.3fs'}
 local log = tnt.Log{
    keys = logkeys,
    onSet = {
@@ -226,6 +227,11 @@ local criterion = nn.BCECriterion()
 local engine   = tnt.OptimEngine()
 local avgloss  = tnt.AverageValueMeter()
 local mapmeter = tnt.mAPMeter()
+local timer    = tnt.TimeMeter()
+
+engine.hooks.onStartEpoch = function(state)
+   timer:reset()
+end
 
 local visualize_window
 engine.hooks.onForwardCriterion = function(state)
@@ -274,6 +280,7 @@ engine.hooks.onEndEpoch = function(state)
    log:set{
       valid_loss = avgloss:value(),
       valid_acc  = mapmeter:value() * 100,
+      epoch_time = timer:value(),
    }
    log:flush()
 
