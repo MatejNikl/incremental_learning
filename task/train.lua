@@ -101,6 +101,13 @@ local function parse_args(args)
       help    = "visualize the first hidden layer's weights",
    }
 
+   op:option{
+      "--split",
+      default = 0.8,
+      dest    = "split",
+      help    = "keep this percentage for training and the rest for validation"
+   }
+
 
    local opts, args = op:parse()
 
@@ -115,7 +122,8 @@ local function parse_args(args)
    opts.batch_size  = tonumber(opts.batch_size)
    opts.dropout     = tonumber(opts.dropout)
    opts.dropconnect = tonumber(opts.dropconnect)
-   opts.layers = loadstring("return {" .. opts.layers .. "}")()
+   opts.split       = tonumber(opts.split)
+   opts.layers      = loadstring("return {" .. opts.layers .. "}")()
 
    return opts, args
 end
@@ -154,12 +162,20 @@ local function create_net(opts)
    return net
 end
 
-
-local logkeys = {'loss', 'accuracy', 'per_class'}
+local logkeys = {
+   'epoch',
+   'train_loss',
+   'train_acc',
+   'valid_loss',
+   'valid_acc',
+}
 
 local logtext   = require 'torchnet.log.view.text'
 local logstatus = require 'torchnet.log.view.status'
 
+local lossfmt = '%10.8f'
+local accfmt  = '%7.3f%%'
+local format  = {'%4d', lossfmt, accfmt, lossfmt, accfmt}
 local log = tnt.Log{
    keys = logkeys,
    onSet = {
@@ -168,12 +184,12 @@ local log = tnt.Log{
    onFlush = {
       logtext{
          keys   = logkeys,
-         format = {'%10.8f', '%7.3f%%', '%s'},
+         format = format,
       },
       logtext{
          filename = 'log.txt',
          keys     = logkeys,
-         format   = {'%10.8f', '%7.3f', '%s'},
+         format   = format,
       },
    },
 }
@@ -182,7 +198,14 @@ sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
 
-local train_dataset = opts.train_path and torch.load(opts.train_path) or nil
+local train_dataset =
+   opts.train_path
+   and torch.load(opts.train_path):shuffle():split{
+      train = opts.split,
+      valid = 1 - opts.split
+   }
+   or nil
+
 local test_dataset  = opts.test_path and torch.load(opts.test_path) or nil
 
 local net
@@ -200,44 +223,22 @@ print(net)
 
 local criterion = nn.BCECriterion()
 
-local engine  = tnt.OptimEngine()
-local apmeter = tnt.APMeter()
-local avgloss = tnt.AverageValueMeter()
-
-apmeter.strvalue = argcheck{
-   {name='self', type='tnt.APMeter'},
-   call =
-   function(self)
-      local str = ''
-      local val = self:value()
-      for i = 1, val:nElement() do
-         str = str .. string.format('%7.3f%% ', val[i] * 100)
-      end
-
-      return str
-   end
-}
-
-
-engine.hooks.onStartEpoch = function(state)
-   avgloss:reset()
-   apmeter:reset()
-   log:status("Epoch: " .. state.epoch)
-end
+local engine   = tnt.OptimEngine()
+local avgloss  = tnt.AverageValueMeter()
+local mapmeter = tnt.mAPMeter()
 
 local visualize_window
 engine.hooks.onForwardCriterion = function(state)
    avgloss:add(state.criterion.output)
-   apmeter:add(state.network.output, state.sample.target)
+   mapmeter:add(state.network.output, state.sample.target)
 
    if opts.visualize then
       local parameters
-      local nunits
       for _, module in ipairs(net.modules) do
          if module.__typename == "nn.Linear"
             or module.__typename == "nn.LinearDropconnect" then
-            nunits     = module.weight:size(1)
-            parameters = module.weight:view(nunits, 64, 64)
+            local nunits = module.weight:size(1)
+            parameters   = module.weight:view(nunits, 64, 64)
             break
          end
       end
@@ -251,24 +252,40 @@ engine.hooks.onForwardCriterion = function(state)
          win  = visualize_window
       }
    end
-
-   if state.training then
-      log:set{
-         loss      = avgloss:value(),
-         accuracy  = apmeter:value():mean() * 100,
-         per_class = apmeter:strvalue(),
-      }
-      log:flush()
-
-   end
 end
 
 engine.hooks.onEndEpoch = function(state)
-   state.iterator:exec('resample') -- call :resample() on the underlying dataset
+   log:set{
+      epoch      = state.epoch,
+      train_loss = avgloss:value(),
+      train_acc  = mapmeter:value() * 100,
+   }
+   avgloss:reset()
+   mapmeter:reset()
+
+   train_dataset:select('valid')
+   engine:test{
+      network   = net,
+      iterator  = train_dataset:batch(train_dataset:size()):iterator(),
+      criterion = criterion,
+   }
+   train_dataset:select('train')
+
+   log:set{
+      valid_loss = avgloss:value(),
+      valid_acc  = mapmeter:value() * 100,
+   }
+   log:flush()
+
+   avgloss:reset()
+   mapmeter:reset()
+
 
    if _G.interrupted then
       state.maxepoch = 0 -- end training
    end
+
+   state.iterator:exec('resample') -- call :resample() on the underlying dataset
 end
 
 
@@ -286,7 +303,7 @@ end
 if opts.test_path then
    -- measure test loss and error:
    avgloss:reset()
-   apmeter:reset()
+   mapmeter:reset()
 
    engine:test{
       network   = net,
@@ -294,13 +311,9 @@ if opts.test_path then
       criterion = criterion,
    }
 
-   log:status("Stats on the test set:")
-   log:set{
-      loss      = avgloss:value(),
-      accuracy  = apmeter:value():mean() * 100,
-      per_class = apmeter:strvalue(),
-   }
-   log:flush()
+   print("Stats on the test set:")
+   print(string.format("Loss: " .. lossfmt, avgloss:value()))
+   print(string.format("Acc: " .. accfmt, mapmeter:value() * 100))
 
    if opts.visual_check then
       local w
