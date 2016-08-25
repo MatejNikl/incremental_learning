@@ -162,38 +162,74 @@ local function create_net(opts)
    return net
 end
 
-local logkeys = {
-   'epoch',
-   'train_loss',
-   'train_acc',
-   'valid_loss',
-   'valid_acc',
-   'epoch_time',
-}
-
-local logtext   = require 'torchnet.log.view.text'
-local logstatus = require 'torchnet.log.view.status'
-
 local lossfmt = '%10.8f'
 local accfmt  = '%7.3f%%'
-local format  = {'%4d', lossfmt, accfmt, lossfmt, accfmt, '%7.3fs'}
-local log = tnt.Log{
-   keys = logkeys,
-   onSet = {
-      logstatus{}
-   },
-   onFlush = {
-      logtext{
-         keys   = logkeys,
-         format = format,
-      },
-      logtext{
-         filename = 'log.txt',
-         keys     = logkeys,
-         format   = format,
-      },
-   },
+local create_log = argcheck{
+   {name='path', type='string', default='log.txt'},
+   call =
+      function(path)
+         local logkeys = {
+            'epoch',
+            'train_loss',
+            'train_acc',
+            'valid_loss',
+            'valid_acc',
+            'epoch_time',
+         }
+
+         local logtext   = require 'torchnet.log.view.text'
+         local logstatus = require 'torchnet.log.view.status'
+
+         local format  = {'%4d', lossfmt, accfmt, lossfmt, accfmt, '%7.3fs'}
+
+         return tnt.Log{
+            keys = logkeys,
+            onSet = {
+               logstatus{}
+            },
+            onFlush = {
+               logtext{
+                  keys   = logkeys,
+                  format = format,
+               },
+               logtext{
+                  filename = path,
+                  keys     = logkeys,
+                  format   = format,
+               },
+            },
+         }
+      end
 }
+
+local visualize_layer = argcheck{
+   {name='modules', type='table'},
+   {name='window',  type='table', opt=true},
+   {name='per_row', type='number', default=10},
+
+   call =
+      function(modules, window, per_row)
+         local parameters
+         for _, module in ipairs(modules) do
+            if module.__typename == "nn.Linear"
+               or module.__typename == "nn.LinearDropconnect" then
+               local nunits = module.weight:size(1)
+               parameters   = module.weight:view(nunits, 64, 64)
+               break
+            end
+         end
+
+         return image.display{
+            image = image.toDisplayTensor{
+               input   = parameters,
+               nrow    = per_row,
+               padding = 1},
+            zoom = 2,
+            win  = window
+         }
+      end
+}
+
 
 sig.signal(sig.SIGINT, sig.signal_handler)
 
@@ -207,7 +243,7 @@ local train_dataset =
    }
    or nil
 
-local test_dataset  = opts.test_path and torch.load(opts.test_path) or nil
+local test_dataset = opts.test_path and torch.load(opts.test_path) or nil
 
 local net
 if opts.use_net then
@@ -224,40 +260,29 @@ print(net)
 
 local criterion = nn.BCECriterion()
 
+local log      = create_log()
 local engine   = tnt.OptimEngine()
 local avgloss  = tnt.AverageValueMeter()
 local mapmeter = tnt.mAPMeter()
 local timer    = tnt.TimeMeter()
 
 engine.hooks.onStartEpoch = function(state)
+   avgloss:reset()
+   mapmeter:reset()
    timer:reset()
 end
 
 local visualize_window
+
+engine.hooks.onStart = function(state)
+   if opts.visualize then
+      visualize_window = visualize_layer(net.modules, visualize_window)
+   end
+end
+
 engine.hooks.onForwardCriterion = function(state)
    avgloss:add(state.criterion.output)
    mapmeter:add(state.network.output, state.sample.target)
-
-   if opts.visualize then
-      local parameters
-      for _, module in ipairs(net.modules) do
-         if module.__typename == "nn.Linear"
-            or module.__typename == "nn.LinearDropconnect" then
-            local nunits = module.weight:size(1)
-            parameters   = module.weight:view(nunits, 64, 64)
-            break
-         end
-      end
-
-      visualize_window = image.display{
-         image = image.toDisplayTensor{
-            input   = parameters,
-            nrow    = 10,
-            padding = 1},
-         zoom = 2,
-         win  = visualize_window
-      }
-   end
 end
 
 engine.hooks.onEndEpoch = function(state)
@@ -284,11 +309,12 @@ engine.hooks.onEndEpoch = function(state)
    }
    log:flush()
 
-   avgloss:reset()
-   mapmeter:reset()
-
+   if opts.visualize then
+      visualize_window = visualize_layer(net.modules, visualize_window)
+   end
 
    if _G.interrupted then
+      if visualize_window then visualize_window.window:close() end
       state.maxepoch = 0 -- end training
    end
 
@@ -309,9 +335,6 @@ end
 
 if opts.test_path then
    -- measure test loss and error:
-   avgloss:reset()
-   mapmeter:reset()
-
    engine:test{
       network   = net,
       iterator  = test_dataset:batch(test_dataset:size()):iterator(),
@@ -334,7 +357,10 @@ if opts.test_path then
          print("Press enter to load next example...")
          io.read()
 
-         if _G.interrupted then break end
+         if _G.interrupted then
+            if w then w.window:close() end
+            break
+         end
       end
    end
 end
@@ -343,5 +369,3 @@ if #args > 0 then
    torch.save(args[1], net:clearState())
    print("Saved the trained network as '" .. args[1] .. "'")
 end
-
-if visualize_window then visualize_window.window:close() end
