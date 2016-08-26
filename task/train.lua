@@ -115,6 +115,12 @@ local function parse_args(args)
       help   = "after training show input images one by one + the net's responses",
    }
 
+   op:option{
+      "--seed",
+      dest = "seed",
+      help = "manual seed for experiment repeatability",
+   }
+
 
    local opts, args = op:parse()
 
@@ -124,6 +130,10 @@ local function parse_args(args)
       op:fail("The testing dataset file must exit!")
    elseif opts.use_net and not paths.filep(opts.use_net) then
       op:fail("The file containing previously saved nn must exit!")
+   end
+
+   if opts.seed then
+      torch.manualSeed(tonumber(opts.seed))
    end
 
    opts.batch_size  = tonumber(opts.batch_size)
