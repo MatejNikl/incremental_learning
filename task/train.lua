@@ -370,7 +370,7 @@ if opts.train_path then
       iterator    = train_dataset:shuffle():batch(opts.batch_size):iterator(),
       criterion   = criterion,
       optimMethod = optim[opts.optim],
-      maxepoch    = 100,
+      maxepoch    = math.huge,
    }
 end
 
