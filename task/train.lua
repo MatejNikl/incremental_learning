@@ -7,6 +7,7 @@ local optim    = require 'optim'
 local tnt      = require 'torchnet'
 
 require 'dropconnect'
+require 'early_stopper'
 
 local function parse_args(args)
    local op = xlua.OptionParser("train.lua --train TRAIN_DATASET"
@@ -192,6 +193,7 @@ local create_log = argcheck{
             'train_acc',
             'valid_loss',
             'valid_acc',
+            'learn_rate',
             'epoch_time',
             'new_best',
          }
@@ -199,7 +201,7 @@ local create_log = argcheck{
          local logtext   = require 'torchnet.log.view.text'
          local logstatus = require 'torchnet.log.view.status'
 
-         local format = {'%4d', lossfmt, accfmt, lossfmt, accfmt, '%7.3fs', '%s'}
+         local format = {'%4d', lossfmt, accfmt, lossfmt, accfmt, '%9.7f', '%7.3fs', '%s'}
 
          return tnt.Log{
             keys = logkeys,
@@ -249,25 +251,6 @@ local visualize_layer = argcheck{
       end
 }
 
-local best_acc = -math.huge
-local best_net
-local epochs_waited
-local early_stopping = argcheck{
-   {name='current_acc', type='number'},
-   {name='net', type='nn.Sequential'},
-   call =
-      function(current_acc, net)
-         if current_acc > best_acc then
-            best_acc = current_acc
-            best_net = net:clone():clearState()
-            epochs_waited = 0
-         else
-            epochs_waited = epochs_waited + 1
-         end
-
-         return epochs_waited
-      end
-}
 
 sig.signal(sig.SIGINT, sig.signal_handler)
 
@@ -303,6 +286,7 @@ local engine   = tnt.OptimEngine()
 local avgloss  = tnt.AverageValueMeter()
 local mapmeter = tnt.mAPMeter()
 local timer    = tnt.TimeMeter()
+local stopper  = EarlyStopper(opts.try_epochs)
 
 engine.hooks.onStartEpoch = function(state)
    avgloss:reset()
@@ -339,13 +323,14 @@ engine.hooks.onEndEpoch = function(state)
    }
    train_dataset:select('train')
 
-   local epochs_waited = early_stopping(mapmeter:value(), state.network)
+   stopper:epoch(mapmeter:value(), state.network)
 
    log:set{
       valid_loss = avgloss:value(),
       valid_acc  = mapmeter:value() * 100,
+      learn_rate = state.config.learningRate,
       epoch_time = timer:value(),
-      new_best   = epochs_waited == 0 and '<--' or ''
+      new_best   = stopper:improved() and '<--' or '',
    }
    log:flush()
 
@@ -354,7 +339,17 @@ engine.hooks.onEndEpoch = function(state)
       visualize_window = visualize_layer(state.network.modules, visualize_window)
    end
 
-   if epochs_waited == opts.try_epochs or _G.interrupted then
+   if stopper:shouldStop() then
+      if not tried_lowering then
+         stopper:resetEpochs()
+         state.config.learningRate = state.config.learningRate / 3
+         tried_lowering = true
+      end
+   elseif stopper:improved() then
+      tried_lowering = false
+   end
+
+   if stopper:shouldStop() or _G.interrupted then
       if visualize_window then visualize_window.window:close() end
       state.maxepoch = 0 -- end training
    end
@@ -370,16 +365,19 @@ if opts.train_path then
       criterion   = criterion,
       optimMethod = optim[opts.optim],
       maxepoch    = math.huge,
+      config      = {
+         learningRate = 0.001
+      }
    }
 end
 
-net = nil -- use best_net instead
+net = stopper:getBestNet()
 
 
 if opts.test_path then
    -- measure test loss and error:
    engine:test{
-      network   = best_net,
+      network   = net,
       iterator  = test_dataset:batch(test_dataset:size()):iterator(),
       criterion = criterion,
    }
@@ -393,7 +391,7 @@ if opts.test_path then
       _G.interrupted = nil
       for data in test_dataset:iterator()() do
          w = image.display{image=data.input:view(1, 64, 64), win = w}
-         local a = best_net:forward(data.input):squeeze()
+         local a = net:forward(data.input):squeeze()
          local b = data.target
          a = torch.cat(a, a:ge(0.5):double(), 2)
          print(torch.cat(a, b, 2):t())
@@ -409,6 +407,6 @@ if opts.test_path then
 end
 
 if #args > 0 then
-   torch.save(args[1], best_net)
+   torch.save(args[1], net)
    print("Saved the best trained network as '" .. args[1] .. "'")
 end
