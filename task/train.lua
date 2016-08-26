@@ -311,9 +311,8 @@ engine.hooks.onStartEpoch = function(state)
 end
 
 local visualize_window
-
 engine.hooks.onStart = function(state)
-   if opts.visualize then
+   if state.training and opts.visualize then
       visualize_window = visualize_layer(state.network.modules, visualize_window)
    end
 end
