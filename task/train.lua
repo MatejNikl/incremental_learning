@@ -149,11 +149,11 @@ end
 
 local function create_net(opts)
    local net = nn.Sequential()
-   local bias = not opts.batchnorm
 
    for i = 2, #opts.layers do
       local nprev = opts.layers[i-1]
       local ncurr = opts.layers[i]
+      local bias  = not opts.batchnorm or i == #opts.layers
 
       if opts.dropout > 0 then
          net:add(nn.Dropout(opts.dropout))
@@ -165,11 +165,10 @@ local function create_net(opts)
          net:add(nn.LinearDropconnect(nprev, ncurr, opts.dropconnect, bias))
       end
 
-      if opts.batchnorm then
-         net:add(nn.BatchNormalization(ncurr))
-      end
-
       if i < #opts.layers then
+         if opts.batchnorm then
+            net:add(nn.BatchNormalization(ncurr))
+         end
          net:add(nn[opts.act]())
       else
          net:add(nn.Sigmoid())
