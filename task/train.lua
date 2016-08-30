@@ -257,10 +257,10 @@ local opts, args = parse_args(_G.arg)
 
 local train_dataset =
    opts.train_path
-   and torch.load(opts.train_path):shuffle():split{
+   and torch.load(opts.train_path):shuffle():split({
       train = opts.split,
       valid = 1 - opts.split
-   }
+   }, 'train')
    or nil
 
 local test_dataset = opts.test_path and torch.load(opts.test_path) or nil
