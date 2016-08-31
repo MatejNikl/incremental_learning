@@ -1,28 +1,49 @@
-local sig = require 'signal'
+local cmdio = require 'cmdio'
+local sig   = require 'signal'
 
 local argcheck = require 'argcheck'
 local image    = require 'image'
 local nn       = require 'nn'
 local optim    = require 'optim'
 local tnt      = require 'torchnet'
+local nngraph  = require 'nngraph'
+
 
 require 'dropconnect'
 require 'early_stopper'
 
 local function parse_args(args)
    local op = xlua.OptionParser("train.lua --train TRAIN_DATASET"
-      .. " --test TEST_DATASET [OPTIONS...] SAVE_NET.t7")
+      .. " --test TEST_DATASET --shared SHARED_NN --secific SPECIFIC_NN"
+      .. " [OPTIONS...] PREVIOUSLY_TRAINED_SPECIFIC_NNs...\n\n"
+      .. [[
+Further description to fill in...]])
 
    op:option{
       "--train",
       dest = "train_path",
-      help = "a file containing training data",
+      help = "a training datafile",
    }
 
    op:option{
       "--test",
       dest = "test_path",
-      help = "a file containing testing data",
+      help = "a testing datafile",
+      req  = true,
+   }
+
+   op:option{
+      "--shared",
+      dest = "shared_path",
+      help = "a previously created shared part of the nn",
+      req = true,
+   }
+
+   op:option{
+      "--specific",
+      dest = "specific_path",
+      help = "a previously created specific part of the nn",
+      req = true,
    }
 
    op:option{
@@ -40,9 +61,10 @@ local function parse_args(args)
    }
 
    op:option{
-      "--use-net",
-      dest = "use_net",
-      help = "a file containing a previously saved nn",
+      "--N",
+      default = 2,
+      dest    = "n",
+      help    = "N parameter for softmax lowering",
    }
 
    op:option{
@@ -57,42 +79,6 @@ local function parse_args(args)
       default = 100,
       dest    = "batch_size",
       help    = "the batch size to use for training",
-   }
-
-   op:option{
-      "--act",
-      default = "ReLU",
-      dest    = "act",
-      help    = "activation function: ReLU | ELU | Tanh | Sigmoid",
-   }
-
-   op:option{
-      "--layers",
-      dest    = "layers",
-      default = "100,100",
-      help    = "comma separated hidden layer sizes",
-   }
-
-   op:option{
-      "--batchnorm",
-      action  = "store_true",
-      default = false,
-      dest    = "batchnorm",
-      help    = "use batch normalization before each activation",
-   }
-
-   op:option{
-      "--dropout",
-      default = 0,
-      dest    = "dropout",
-      help    = "use dropout with specified probability",
-   }
-
-   op:option{
-      "--dropconnect",
-      dest    = "dropconnect",
-      default = 0,
-      help    = "use dropconnect with specified probability",
    }
 
    op:option{
@@ -122,63 +108,29 @@ local function parse_args(args)
       help = "manual seed for experiment repeatability",
    }
 
-
    local opts, args = op:parse()
 
-   if opts.train_path and not paths.filep(opts.train_path) then
-      op:fail("The training dataset file must exist!")
-   elseif opts.test_path and not paths.filep(opts.test_path) then
-      op:fail("The testing dataset file must exit!")
-   elseif opts.use_net and not paths.filep(opts.use_net) then
-      op:fail("The file containing previously saved nn must exit!")
+   local function check(path)
+      if path and not paths.filep(path) then
+         op:fail("The '" .. path .. "' file does not exist!")
+      end
    end
 
    if opts.seed then
       torch.manualSeed(tonumber(opts.seed))
    end
 
-   opts.batch_size  = tonumber(opts.batch_size)
-   opts.dropout     = tonumber(opts.dropout)
-   opts.dropconnect = tonumber(opts.dropconnect)
-   opts.split       = tonumber(opts.split)
-   opts.try_epochs  = tonumber(opts.try_epochs)
-   opts.layers      = loadstring("return {" .. opts.layers .. "}")()
+   check(opts.train_path)
+   check(opts.test_path)
+   check(opts.shared_path)
+   check(opts.specific_path)
+
+   opts.split      = tonumber(opts.split)
+   opts.try_epochs = tonumber(opts.try_epochs)
+   opts.batch_size = tonumber(opts.batch_size)
+   opts.n          = tonumber(opts.n)
 
    return opts, args
-end
-
-local function create_net(opts)
-   local net = nn.Sequential()
-   local bias = not opts.batchnorm
-
-   for i = 2, #opts.layers do
-      local nprev = opts.layers[i-1]
-      local ncurr = opts.layers[i]
-
-      if opts.dropout > 0 then
-         net:add(nn.Dropout(opts.dropout))
-      end
-
-      if opts.dropconnect == 0 then
-         net:add(nn.Linear(nprev, ncurr, bias))
-      else
-         net:add(nn.LinearDropconnect(nprev, ncurr, opts.dropconnect, bias))
-      end
-
-      if opts.batchnorm then
-         net:add(nn.BatchNormalization(ncurr))
-      end
-
-      if i < #opts.layers then
-         net:add(nn[opts.act]())
-      else
-         net:add(nn.Sigmoid())
-      end
-   end
-
-   net = require('weight-init')(net, opts.weight_init)
-
-   return net
 end
 
 local lossfmt = '%10.8f'
@@ -251,35 +203,85 @@ local visualize_layer = argcheck{
       end
 }
 
+local visual_check = argcheck{
+   {name='net', type='nn.Container'},
+   {name='dataset', type='tnt.Dataset'},
+   call =
+      function(net, dataset)
+         local w
+         _G.interrupted = nil
+         for data in test_dataset:iterator()() do
+            w = image.display{image=data.input:view(1, 64, 64), win = w}
+            local a = net:forward(data.input):squeeze()
+            local b = data.target
+            a = torch.cat(a, a:ge(0.5):double(), 2)
+            print(torch.cat(a, b, 2):t())
+            print("Press enter to load next example...")
+            io.read()
+
+            if _G.interrupted then
+               if w then w.window:close() end
+               break
+            end
+         end
+      end
+}
+
+local extend_dataset = argcheck{
+   {name='dataset', type='tnt.Dataset'},
+   {name='net', type='nn.Container'},
+   call =
+      function(dataset, net)
+         local input  = {}
+         local target = {}
+
+         net:evaluate()
+
+         -- TODO MIGHT NOT WORK FOR SMALLER BATCH SIZES AS WELL???
+         for data in dataset:batch(dataset:size()):iterator()() do
+            local sm = net:forward(data.input)
+
+            if type(sm) ~= 'table' then sm = {sm} end
+
+            for i = 1, data.target:size(1) do
+               local tmp = {data.target[i]}
+
+               for j = 1, #sm do
+                  table.insert(tmp, sm[j][i])
+               end
+               -- tnt.utils.table.foreach(
+               --    sm,
+               --    function(item)
+               --       table.insert(tmp, item[i])
+               --    end
+               -- )
+
+               table.insert(input, data.input[i])
+               table.insert(target, tmp)
+            end
+         end
+
+         input = tnt.utils.table.mergetensor(input)
+
+         return tnt.ListDataset{
+            list = torch.range(1, dataset:size()):long(),
+            load =
+               function(idx)
+                  return {
+                     input = input[idx],
+                     target = target[idx],
+                  }
+               end,
+         }
+      end
+}
+
+
+-- [[MAIN BEGINS HERE ]]----
 
 sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
-
-local train_dataset =
-   opts.train_path
-   and torch.load(opts.train_path):shuffle():split{
-      train = opts.split,
-      valid = 1 - opts.split
-   }
-   or nil
-
-local test_dataset = opts.test_path and torch.load(opts.test_path) or nil
-
-local net
-if opts.use_net then
-   net = torch.load(opts.use_net)
-   print("Loaded a nn from the file '" .. opts.use_net .. "'")
-else
-   table.insert(opts.layers, 1, train_dataset:get(1).input:nElement())
-   table.insert(opts.layers, train_dataset:get(1).target:nElement())
-   net = create_net(opts)
-end
-
-print(net)
-
-
-local criterion = nn.BCECriterion()
 
 local log      = create_log()
 local engine   = tnt.OptimEngine()
@@ -303,7 +305,11 @@ end
 
 engine.hooks.onForwardCriterion = function(state)
    avgloss:add(state.criterion.output)
-   mapmeter:add(state.network.output, state.sample.target)
+   if type(state.network.output) == 'table' then
+      mapmeter:add(state.network.output[1], state.sample.target[1])
+   else
+      mapmeter:add(state.network.output, state.sample.target)
+   end
 end
 
 engine.hooks.onEndEpoch = function(state)
@@ -315,13 +321,18 @@ engine.hooks.onEndEpoch = function(state)
    avgloss:reset()
    mapmeter:reset()
 
-   train_dataset:select('valid')
+   -- train_dataset:select('valid')
+   state.iterator:exec('select', 'valid')
+   state.iterator:exec('resample')
    engine:test{
       network   = state.network,
-      iterator  = train_dataset:batch(train_dataset:size()):iterator(),
-      criterion = criterion,
+      -- iterator  = train_dataset:batch(train_dataset:size()):iterator(),
+      iterator  = state.iterator,
+      criterion = state.criterion,
    }
-   train_dataset:select('train')
+   -- train_dataset:select('train')
+   state.iterator:exec('select', 'train')
+   state.iterator:exec('resample') -- call :resample() on the underlying dataset
 
    stopper:epoch(mapmeter:value(), state.network)
 
@@ -353,29 +364,44 @@ engine.hooks.onEndEpoch = function(state)
       if visualize_window then visualize_window.window:close() end
       state.maxepoch = 0 -- end training
    end
-
-   state.iterator:exec('resample') -- call :resample() on the underlying dataset
 end
 
-if opts.train_path then
-   -- train the model:
-   engine:train{
-      network     = net,
-      iterator    = train_dataset:shuffle():batch(opts.batch_size):iterator(),
-      criterion   = criterion,
-      optimMethod = optim[opts.optim],
-      maxepoch    = math.huge,
-      config      = {
-         learningRate = 0.001
+-- local criterion
+local net
+local shared    = torch.load(opts.shared_path)
+local specific  = torch.load(opts.specific_path)
+
+local test_dataset  = torch.load(opts.test_path)
+
+if #args == 0 then -- only the first specific + shared parameters to train
+   criterion = nn.BCECriterion()
+
+   net = nn.Sequential():add(shared):add(specific)
+
+   print(net)
+
+   if opts.train_path then
+      local train_dataset = torch.load(opts.train_path):shuffle()
+      net = require('weight-init')(net, opts.weight_init)
+      engine:train{
+         network     = net,
+         iterator    =
+            train_dataset
+            :split{train = opts.split, valid = 1-opts.split}
+            :shuffle()
+            :batch(opts.batch_size)
+            :iterator(),
+         criterion   = criterion,
+         optimMethod = optim[opts.optim],
+         maxepoch    = math.huge,
+         config      = {
+            learningRate = 0.001
+         }
       }
-   }
-end
 
-net = stopper:getBestNet()
+      net = stopper:getBestNet()
+   end
 
-
-if opts.test_path then
-   -- measure test loss and error:
    engine:test{
       network   = net,
       iterator  = test_dataset:batch(test_dataset:size()):iterator(),
@@ -387,26 +413,248 @@ if opts.test_path then
    print(string.format("Acc: " .. accfmt, mapmeter:value() * 100))
 
    if opts.visual_check then
-      local w
-      _G.interrupted = nil
-      for data in test_dataset:iterator()() do
-         w = image.display{image=data.input:view(1, 64, 64), win = w}
-         local a = net:forward(data.input):squeeze()
-         local b = data.target
-         a = torch.cat(a, a:ge(0.5):double(), 2)
-         print(torch.cat(a, b, 2):t())
-         print("Press enter to load next example...")
-         io.read()
+      visual_check(net, test_dataset)
+   end
 
-         if _G.interrupted then
-            if w then w.window:close() end
-            break
-         end
+   if opts.train_path then
+      if cmdio.check_useragrees("Overwrite shared net") then
+         torch.save(opts.shared_path, net.modules[1])
+         print("File '" .. opts.shared_path .. "' saved.")
+      end
+      if cmdio.check_useragrees("Overwrite specific net") then
+         torch.save(opts.specific_path, net.modules[2])
+         print("File '" .. opts.specific_path .. "' saved.")
       end
    end
-end
+else
+   local train_dataset = torch.load(opts.train_path):shuffle()
+   criterion = nn.BCECriterion()
+   specific  = require('weight-init')(specific, opts.weight_init)
+   print(specific)
 
-if #args > 0 then
-   torch.save(args[1], net)
-   print("Saved the best trained network as '" .. args[1] .. "'")
+   local preprocessed_input = {}
+   local target = {}
+
+   shared:evaluate()
+
+   print("Pre-processing dataset for fine-tuning...")
+
+   -- TODO DOES NOT WORK FOR SMALLER BATCH SIZE?!?!?!?!?!?!?
+   for data in train_dataset:batch(train_dataset:size()):iterator()() do
+      local a = shared:forward(data.input)
+      -- local a = data.input
+      for i = 1, data.input:size(1) do
+         table.insert(preprocessed_input, a[i])
+         table.insert(target, data.target[i])
+      end
+   end
+   preprocessed_input = tnt.utils.table.mergetensor(preprocessed_input)
+   target = tnt.utils.table.mergetensor(target)
+   local preprocessed_dataset = tnt.ListDataset{
+      list = torch.range(1, train_dataset:size()):long(),
+      load =
+         function(idx)
+            return {
+               input  = preprocessed_input[idx],
+               target = target[idx],
+            }
+         end,
+   }
+
+   -- local pre2 = train_dataset:transform(function(input) return shared:forward(input) end, 'input')
+
+   -- for i = 1, pre2:size() do
+   --    local ai = preprocessed_dataset:get(i).input
+   --    local bi = pre2:get(i).input
+   --    local at = preprocessed_dataset:get(i).target
+   --    local bt = pre2:get(i).target
+
+   --    if ai:eq(bi):min() == 0 then
+   --       print(ai)
+   --       print(bi)
+   --       error('inputs mismatch')
+   --    end
+   --    if at:eq(bt):min() == 0 then
+   --       print(at)
+   --       print(bt)
+   --       error('targets mismatch')
+   --    end
+   -- end
+
+   print("Fine-tuning new specific net...")
+
+   engine:train{
+      network  = specific,
+      iterator =
+         preprocessed_dataset
+         :split{train = opts.split, valid = 1-opts.split}
+         :shuffle()
+         :batch(opts.batch_size)
+         -- :transform(function(input) return shared:forward(input) end, 'input')
+         :iterator(),
+      criterion   = criterion,
+      optimMethod = optim[opts.optim],
+      maxepoch    = math.huge,
+      config      = {
+         learningRate = 0.001
+      }
+   }
+
+   specific = stopper:getBestNet()
+
+   engine:test{
+      network   = nn.Sequential():add(shared):add(specific),
+      iterator  = test_dataset:batch(test_dataset:size()):iterator(),
+      criterion = criterion,
+   }
+
+   print("Stats on the test set:")
+   print(string.format("Loss: " .. lossfmt, avgloss:value()))
+   print(string.format("Acc: " .. accfmt, mapmeter:value() * 100))
+
+   criterion = nn.ParallelCriterion():add(nn.BCECriterion()) -- for the new spec. net
+
+   local specific_old = tnt.utils.table.foreach(
+      args,
+      function(item)
+         criterion:add(nn.DistKLDivCriterion()) -- for each old spec. net
+         return torch.load(item)
+      end
+   )
+
+   -- create copy of specific nets with shared parametes for later saving
+   local for_saving = {
+      shared        = shared,
+      specific      = specific,
+      specific_old  = tnt.utils.table.foreach(
+         specific_old,
+         function(item)
+            return item:clone('weight', 'bias', 'running_mean', 'running_var')
+         end
+      )
+   }
+
+   -- modify old specific nets to output temperatured SoftMax
+   tnt.utils.table.foreach(
+      specific_old,
+      function(item)
+         item:remove() -- remove last module
+         if opts.n ~= 1 then item:add(nn.MulConstant(1/opts.n)) end
+         item:add(nn.LogSoftMax())
+      end
+   )
+
+   stopper:setClosure(
+      function()
+         return {
+            shared = for_saving.shared:clone():clearState(),
+            specific = for_saving.specific:clone():clearState(),
+            specific_old = tnt.utils.table.foreach(
+               for_saving.specific_old,
+               function(item)
+                  return item:clone():clearState()
+               end
+            )
+         }
+      end
+   )
+
+   gshared = shared()
+   local preprocess_net = nn.gModule(
+      {gshared},
+      tnt.utils.table.foreach(
+         specific_old,
+         function(item)
+            return item(gshared)
+         end
+      )
+   )
+
+   print("Saving old specific nets' outputs...")
+
+   train_dataset = extend_dataset(train_dataset, preprocess_net)
+   test_dataset  = extend_dataset(test_dataset, preprocess_net)
+
+   print("INCREMENTAL TRAINING...")
+
+   _G.interrupted = false
+   gshared = shared()
+   gspecific = {specific(gshared)}
+   tnt.utils.table.foreach(
+      specific_old,
+      function(item)
+         table.insert(gspecific, item(gshared))
+      end
+   )
+
+   engine:train{
+      network  = nn.gModule({gshared}, gspecific),
+      iterator =
+         train_dataset
+         :split{train = opts.split, valid = 1-opts.split}
+         :shuffle()
+         :batch(opts.batch_size,
+               function(idx, size) return idx end,
+               function(table)
+                  table.input  = tnt.utils.table.mergetensor(table.input)
+                  table.target = tnt.transform.tablemergekeys()(table.target)
+                  table.target = tnt.transform.tableapply(
+                     function(field)
+                        if tnt.utils.table.canmergetensor(field) then
+                           return tnt.utils.table.mergetensor(field)
+                        else
+                           return field
+                        end
+                     end
+                  )(table.target)
+                  return table
+               end)
+         :iterator(),
+      criterion   = criterion,
+      optimMethod = optim[opts.optim],
+      maxepoch    = math.huge,
+      config      = {
+         learningRate = 0.001
+      }
+   }
+
+   for_saving = stopper:getBestNet()
+
+   if cmdio.check_useragrees("Overwrite shared net '"
+         .. opts.shared_path .. "'") then
+      torch.save(opts.shared_path, for_saving.shared)
+      print("File saved.")
+   end
+   if cmdio.check_useragrees("Overwrite specific net '"
+         .. opts.specific_path .. "'") then
+      torch.save(opts.specific_path, for_saving.specific)
+      print("File saved.")
+   end
+
+   for i = 1, #args do
+      if cmdio.check_useragrees("Overwrite old specific net '"
+            .. args[i] .. "'") then
+         torch.save(args[i], for_saving.specific_old[i])
+         print("File saved.")
+      end
+   end
+
+   -- gshared = shared()
+   -- gspecific = {specific(gshared)}
+   -- tnt.utils.table.foreach(
+   --    specific_old,
+   --    function(item)
+   --       table.insert(gspecific, item(gshared))
+   --    end
+   -- )
+   -- engine:test{
+   --    network   = nn.Sequential():add(shared):add(specific),
+   --    iterator  = test_dataset:batch(test_dataset:size()):iterator(),
+   --    criterion = criterion,
+   -- }
+
+   -- print("Stats on the test set:")
+   -- print(string.format("Loss: " .. lossfmt, avgloss:value()))
+   -- print(string.format("Acc: " .. accfmt, mapmeter:value() * 100))
+
 end
