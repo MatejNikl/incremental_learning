@@ -104,6 +104,13 @@ local function parse_args(args)
    }
 
    op:option{
+      "--weight-decay",
+      default = 0.003,
+      dest    = "weight_decay",
+      help    = "L2 weight decay",
+   }
+
+   op:option{
       "--visualize",
       action  = "store_true",
       dest    = "visualize",
@@ -138,12 +145,13 @@ local function parse_args(args)
       torch.manualSeed(tonumber(opts.seed))
    end
 
-   opts.batch_size  = tonumber(opts.batch_size)
-   opts.dropout     = tonumber(opts.dropout)
-   opts.dropconnect = tonumber(opts.dropconnect)
-   opts.split       = tonumber(opts.split)
-   opts.try_epochs  = tonumber(opts.try_epochs)
-   opts.layers      = loadstring("return {" .. opts.layers .. "}")()
+   opts.batch_size   = tonumber(opts.batch_size)
+   opts.dropout      = tonumber(opts.dropout)
+   opts.dropconnect  = tonumber(opts.dropconnect)
+   opts.weight_decay = tonumber(opts.weight_decay)
+   opts.split        = tonumber(opts.split)
+   opts.try_epochs   = tonumber(opts.try_epochs)
+   opts.layers       = loadstring("return {" .. opts.layers .. "}")()
 
    return opts, args
 end
@@ -367,7 +375,8 @@ if opts.train_path then
       optimMethod = optim[opts.optim],
       maxepoch    = math.huge,
       config      = {
-         learningRate = 0.001
+         learningRate = 0.001,
+         weightDecay  = opts.weight_decay,
       }
    }
 end
