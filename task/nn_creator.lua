@@ -1,3 +1,5 @@
+local cmdio = require 'cmdio'
+
 local argcheck = require 'argcheck'
 local nn       = require 'nn'
 local tnt      = require 'torchnet'
@@ -33,6 +35,7 @@ that can be used with the shared part and the specified dataset.]])
 
    op:option{
       "--layers",
+      default = "",
       dest    = "layers",
       help    = "comma separated hidden layer sizes",
    }
@@ -80,22 +83,6 @@ that can be used with the shared part and the specified dataset.]])
    opts.layers      = loadstring("return {" .. opts.layers .. "}")()
 
    return opts, args
-end
-
-local function prompt(string)
-    io.write(string)
-    local read = io.read()
-    return #read ~= 0 and read or nil
-end
-
-local function check_useragrees(question)
-    local ans
-
-    repeat
-        ans = prompt(question  .. " ((y)es/(n)o)? ")
-    until ans == "y" or ans == "yes" or ans == "n" or ans == "no"
-
-    return ans == "y" or ans == "yes"
 end
 
 local function create_net(opts, shared)
@@ -174,7 +161,7 @@ for _, path in ipairs(args) do
       local write = true
       if paths.filep(fullpath) then
          print("File '" .. fullpath .. "' already exists.")
-         write = check_useragrees("Overwrite") 
+         write = cmdio.check_useragrees("Overwrite")
       end
 
       if write then
