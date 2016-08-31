@@ -8,6 +8,7 @@ local tnt      = require 'torchnet'
 
 require 'dropconnect'
 require 'early_stopper'
+require 'exactmatchmeter'
 
 local function parse_args(args)
    local op = xlua.OptionParser("train.lua --train TRAIN_DATASET"
@@ -281,16 +282,16 @@ print(net)
 
 local criterion = nn.BCECriterion()
 
-local log      = create_log()
-local engine   = tnt.OptimEngine()
-local avgloss  = tnt.AverageValueMeter()
-local mapmeter = tnt.mAPMeter()
-local timer    = tnt.TimeMeter()
-local stopper  = EarlyStopper(opts.try_epochs)
+local log     = create_log()
+local engine  = tnt.OptimEngine()
+local avgloss = tnt.AverageValueMeter()
+local emmeter = tnt.EMMeter()
+local timer   = tnt.TimeMeter()
+local stopper = EarlyStopper(opts.try_epochs)
 
 engine.hooks.onStartEpoch = function(state)
    avgloss:reset()
-   mapmeter:reset()
+   emmeter:reset()
    timer:reset()
 end
 
@@ -303,17 +304,17 @@ end
 
 engine.hooks.onForwardCriterion = function(state)
    avgloss:add(state.criterion.output)
-   mapmeter:add(state.network.output, state.sample.target)
+   emmeter:add(state.network.output, state.sample.target)
 end
 
 engine.hooks.onEndEpoch = function(state)
    log:set{
       epoch      = state.epoch,
       train_loss = avgloss:value(),
-      train_acc  = mapmeter:value() * 100,
+      train_acc  = emmeter:value() * 100,
    }
    avgloss:reset()
-   mapmeter:reset()
+   emmeter:reset()
 
    train_dataset:select('valid')
    engine:test{
@@ -323,11 +324,11 @@ engine.hooks.onEndEpoch = function(state)
    }
    train_dataset:select('train')
 
-   stopper:epoch(mapmeter:value(), state.network)
+   stopper:epoch(emmeter:value(), state.network)
 
    log:set{
       valid_loss = avgloss:value(),
-      valid_acc  = mapmeter:value() * 100,
+      valid_acc  = emmeter:value() * 100,
       learn_rate = state.config.learningRate,
       epoch_time = timer:value(),
       new_best   = stopper:improved() and '<--' or '',
@@ -384,7 +385,7 @@ if opts.test_path then
 
    print("Stats on the test set:")
    print(string.format("Loss: " .. lossfmt, avgloss:value()))
-   print(string.format("Acc: " .. accfmt, mapmeter:value() * 100))
+   print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
 
    if opts.visual_check then
       local w
