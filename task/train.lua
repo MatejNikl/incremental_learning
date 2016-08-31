@@ -11,6 +11,7 @@ local nngraph  = require 'nngraph'
 
 require 'dropconnect'
 require 'early_stopper'
+require 'exactmatchmeter'
 
 local function parse_args(args)
    local op = xlua.OptionParser("train.lua --train TRAIN_DATASET"
@@ -286,13 +287,13 @@ local opts, args = parse_args(_G.arg)
 local log      = create_log()
 local engine   = tnt.OptimEngine()
 local avgloss  = tnt.AverageValueMeter()
-local mapmeter = tnt.mAPMeter()
+local emmeter = tnt.EMMeter()
 local timer    = tnt.TimeMeter()
 local stopper  = EarlyStopper(opts.try_epochs)
 
 engine.hooks.onStartEpoch = function(state)
    avgloss:reset()
-   mapmeter:reset()
+   emmeter:reset()
    timer:reset()
 end
 
@@ -306,9 +307,9 @@ end
 engine.hooks.onForwardCriterion = function(state)
    avgloss:add(state.criterion.output)
    if type(state.network.output) == 'table' then
-      mapmeter:add(state.network.output[1], state.sample.target[1])
+      emmeter:add(state.network.output[1], state.sample.target[1])
    else
-      mapmeter:add(state.network.output, state.sample.target)
+      emmeter:add(state.network.output, state.sample.target)
    end
 end
 
@@ -316,10 +317,10 @@ engine.hooks.onEndEpoch = function(state)
    log:set{
       epoch      = state.epoch,
       train_loss = avgloss:value(),
-      train_acc  = mapmeter:value() * 100,
+      train_acc  = emmeter:value() * 100,
    }
    avgloss:reset()
-   mapmeter:reset()
+   emmeter:reset()
 
    -- train_dataset:select('valid')
    state.iterator:exec('select', 'valid')
@@ -334,11 +335,11 @@ engine.hooks.onEndEpoch = function(state)
    state.iterator:exec('select', 'train')
    state.iterator:exec('resample') -- call :resample() on the underlying dataset
 
-   stopper:epoch(mapmeter:value(), state.network)
+   stopper:epoch(emmeter:value(), state.network)
 
    log:set{
       valid_loss = avgloss:value(),
-      valid_acc  = mapmeter:value() * 100,
+      valid_acc  = emmeter:value() * 100,
       learn_rate = state.config.learningRate,
       epoch_time = timer:value(),
       new_best   = stopper:improved() and '<--' or '',
@@ -410,7 +411,7 @@ if #args == 0 then -- only the first specific + shared parameters to train
 
    print("Stats on the test set:")
    print(string.format("Loss: " .. lossfmt, avgloss:value()))
-   print(string.format("Acc: " .. accfmt, mapmeter:value() * 100))
+   print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
 
    if opts.visual_check then
       visual_check(net, test_dataset)
@@ -510,7 +511,7 @@ else
 
    print("Stats on the test set:")
    print(string.format("Loss: " .. lossfmt, avgloss:value()))
-   print(string.format("Acc: " .. accfmt, mapmeter:value() * 100))
+   print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
 
    criterion = nn.ParallelCriterion():add(nn.BCECriterion()) -- for the new spec. net
 
@@ -655,6 +656,6 @@ else
 
    -- print("Stats on the test set:")
    -- print(string.format("Loss: " .. lossfmt, avgloss:value()))
-   -- print(string.format("Acc: " .. accfmt, mapmeter:value() * 100))
+   -- print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
 
 end
