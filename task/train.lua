@@ -90,6 +90,13 @@ Further description to fill in...]])
    }
 
    op:option{
+      "--weight-decay",
+      default = 0.003,
+      dest    = "weight_decay",
+      help    = "L2 weight decay",
+   }
+
+   op:option{
       "--visualize",
       action  = "store_true",
       dest    = "visualize",
@@ -396,7 +403,8 @@ if #args == 0 then -- only the first specific + shared parameters to train
          optimMethod = optim[opts.optim],
          maxepoch    = math.huge,
          config      = {
-            learningRate = 0.001
+            learningRate = 0.001,
+            weightDecay  = opts.weight_decay,
          }
       }
 
@@ -497,7 +505,8 @@ else
       optimMethod = optim[opts.optim],
       maxepoch    = math.huge,
       config      = {
-         learningRate = 0.001
+         learningRate = 0.001,
+         weightDecay  = opts.weight_decay,
       }
    }
 
@@ -615,7 +624,8 @@ else
       optimMethod = optim[opts.optim],
       maxepoch    = math.huge,
       config      = {
-         learningRate = 0.001
+         learningRate = 0.001,
+         weightDecay  = opts.weight_decay,
       }
    }
 
