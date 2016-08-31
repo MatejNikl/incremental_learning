@@ -387,7 +387,7 @@ if #args == 0 then -- only the first specific + shared parameters to train
          network     = net,
          iterator    =
             train_dataset
-            :split{train = opts.split, valid = 1-opts.split}
+            :split({train = opts.split, valid = 1-opts.split}, 'train')
             :shuffle()
             :batch(opts.batch_size)
             :iterator(),
@@ -487,7 +487,7 @@ else
       network  = specific,
       iterator =
          preprocessed_dataset
-         :split{train = opts.split, valid = 1-opts.split}
+         :split({train = opts.split, valid = 1-opts.split}, 'train')
          :shuffle()
          :batch(opts.batch_size)
          -- :transform(function(input) return shared:forward(input) end, 'input')
@@ -591,7 +591,7 @@ else
       network  = nn.gModule({gshared}, gspecific),
       iterator =
          train_dataset
-         :split{train = opts.split, valid = 1-opts.split}
+         :split({train = opts.split, valid = 1-opts.split}, 'train')
          :shuffle()
          :batch(opts.batch_size,
                function(idx, size) return idx end,
