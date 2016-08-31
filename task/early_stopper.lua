@@ -5,9 +5,12 @@ local EarlyStopper = torch.class('EarlyStopper')
 EarlyStopper.__init = argcheck{
    {name="self", type="EarlyStopper"},
    {name="try_epochs", type="number"},
+   {name="closure", type="function", help="a function that returns copy of the current best net",
+      default=function(net) return net:clone():clearState() end},
    call =
-      function(self, try_epochs)
+      function(self, try_epochs, closure)
          self.try_epochs = try_epochs
+         self.closure    = closure
          EarlyStopper.reset(self)
       end
 }
@@ -15,14 +18,14 @@ EarlyStopper.__init = argcheck{
 EarlyStopper.epoch = argcheck{
    {name="self", type="EarlyStopper"},
    {name="current_acc", type="number"},
-   {name="net", type="nn.Sequential"},
+   {name="net", type="nn.Container"},
    call =
       function(self, current_acc, net)
          self.is_reset = false
 
          if current_acc > self.best_acc then
             self.best_acc = current_acc
-            self.best_net = net:clone():clearState()
+            self.best_net = self.closure(net)
             self.epochs_waited = 0
          else
             self.epochs_waited = self.epochs_waited + 1
@@ -75,3 +78,12 @@ EarlyStopper.getBestNet = argcheck{
       end
 }
 
+EarlyStopper.setClosure = argcheck{
+   {name="self", type="EarlyStopper"},
+   {name="closure", type="function", help="a function that returns a copy of the current best net"},
+   call =
+      function(self, closure)
+         self.closure = closure
+         return self
+      end
+}
