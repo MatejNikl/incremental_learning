@@ -141,17 +141,19 @@ Further description to fill in...]])
    return opts, args
 end
 
-local lossfmt = '%10.8f'
-local accfmt  = '%7.3f%%'
+local lossfmt = '%8.6f'
+local accfmt  = '%6.2f%%'
 local create_log = argcheck{
    {name='path', type='string', default='log.txt'},
    call =
       function(path)
          local logkeys = {
             'epoch',
-            'train_loss',
+            'train_hardloss',
+            'train_softloss',
             'train_acc',
-            'valid_loss',
+            'valid_hardloss',
+            'valid_softloss',
             'valid_acc',
             'learn_rate',
             'epoch_time',
@@ -161,7 +163,17 @@ local create_log = argcheck{
          local logtext   = require 'torchnet.log.view.text'
          local logstatus = require 'torchnet.log.view.status'
 
-         local format = {'%4d', lossfmt, accfmt, lossfmt, accfmt, '%9.7f', '%7.3fs', '%s'}
+         local format = {
+            '%3d',
+            lossfmt,
+            lossfmt,
+            accfmt,
+            lossfmt,
+            lossfmt,
+            accfmt,
+            '%8.6f',
+            '%5.2fs',
+            '%s'}
 
          return tnt.Log{
             keys = logkeys,
@@ -291,42 +303,101 @@ sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
 
-local log      = create_log()
-local engine   = tnt.OptimEngine()
-local avgloss  = tnt.AverageValueMeter()
-local emmeter = tnt.EMMeter()
-local timer    = tnt.TimeMeter()
-local stopper  = EarlyStopper(opts.try_epochs)
+local log       = create_log()
+local engine    = tnt.OptimEngine()
+local hard_loss = tnt.AverageValueMeter()
+local soft_loss = tnt.AverageValueMeter()
+local emmeter   = tnt.EMMeter()
+local timer     = tnt.TimeMeter()
+local stopper   = EarlyStopper(opts.try_epochs)
 
 engine.hooks.onStartEpoch = function(state)
-   avgloss:reset()
+   hard_loss:reset()
+   soft_loss:reset()
    emmeter:reset()
    timer:reset()
 end
 
 local visualize_window
 engine.hooks.onStart = function(state)
-   if state.training and opts.visualize then
-      visualize_window = visualize_layer(state.network.modules, visualize_window)
+   if state.training then
+      stopper:resetEpochs()
+      hard_loss:reset()
+      soft_loss:reset()
+      emmeter:reset()
+      timer:reset()
+
+      engine:test{
+         network   = state.network,
+         iterator  = state.iterator,
+         criterion = state.criterion,
+      }
+
+      log:set{
+         epoch          = state.epoch,
+         train_hardloss = hard_loss:value(),
+         train_softloss = soft_loss:value(),
+         train_acc      = emmeter:value() * 100,
+      }
+      hard_loss:reset()
+      soft_loss:reset()
+      emmeter:reset()
+
+      state.iterator:exec('select', 'valid')
+      state.iterator:exec('resample')
+      engine:test{
+         network   = state.network,
+         iterator  = state.iterator,
+         criterion = state.criterion,
+      }
+      state.iterator:exec('select', 'train')
+      state.iterator:exec('resample') -- call :resample() on the underlying dataset
+
+      log:set{
+         valid_hardloss = hard_loss:value(),
+         valid_softloss = soft_loss:value(),
+         valid_acc      = emmeter:value() * 100,
+         learn_rate     = 0/0,
+         epoch_time     = timer:value(),
+         new_best       = stopper:improved() and '*' or '',
+      }
+      log:flush()
+
+      if opts.visualize then
+         visualize_window = visualize_layer(state.network.modules, visualize_window)
+      end
    end
 end
 
 engine.hooks.onForwardCriterion = function(state)
-   avgloss:add(state.criterion.output)
    if type(state.network.output) == 'table' then
+      local total_loss = 0
+      local crits   = state.criterion.criterions
+      local weights = state.criterion.weights
+      for i = 2, #crits do
+         total_loss = total_loss + crits[i].output * weights[i]
+      end
+
+      hard_loss:add(crits[1].output)
+      soft_loss:add(total_loss)
       emmeter:add(state.network.output[1], state.sample.target[1])
    else
+      hard_loss:add(state.criterion.output)
+      soft_loss:add(0/0)
       emmeter:add(state.network.output, state.sample.target)
    end
 end
 
 engine.hooks.onEndEpoch = function(state)
    log:set{
-      epoch      = state.epoch,
-      train_loss = avgloss:value(),
-      train_acc  = emmeter:value() * 100,
+      epoch          = state.epoch,
+      train_hardloss = hard_loss:value(),
+      train_softloss = soft_loss:value(),
+      train_acc      = emmeter:value() * 100,
    }
-   avgloss:reset()
+
+   hard_loss:reset()
+   soft_loss:reset()
    emmeter:reset()
 
    -- train_dataset:select('valid')
@@ -334,7 +405,6 @@ engine.hooks.onEndEpoch = function(state)
    state.iterator:exec('resample')
    engine:test{
       network   = state.network,
-      -- iterator  = train_dataset:batch(train_dataset:size()):iterator(),
       iterator  = state.iterator,
       criterion = state.criterion,
    }
@@ -345,11 +415,12 @@ engine.hooks.onEndEpoch = function(state)
    stopper:epoch(emmeter:value(), state.network)
 
    log:set{
-      valid_loss = avgloss:value(),
-      valid_acc  = emmeter:value() * 100,
-      learn_rate = state.config.learningRate,
-      epoch_time = timer:value(),
-      new_best   = stopper:improved() and '<--' or '',
+      valid_hardloss = hard_loss:value(),
+      valid_softloss = soft_loss:value(),
+      valid_acc      = emmeter:value() * 100,
+      learn_rate     = state.config.learningRate,
+      epoch_time     = timer:value(),
+      new_best       = stopper:improved() and '*' or '',
    }
    log:flush()
 
@@ -418,7 +489,7 @@ if #args == 0 then -- only the first specific + shared parameters to train
    }
 
    print("Stats on the test set:")
-   print(string.format("Loss: " .. lossfmt, avgloss:value()))
+   print(string.format("Loss: " .. lossfmt, hard_loss:value()))
    print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
 
    if opts.visual_check then
@@ -519,7 +590,7 @@ else
    }
 
    print("Stats on the test set:")
-   print(string.format("Loss: " .. lossfmt, avgloss:value()))
+   print(string.format("Loss: " .. lossfmt, hard_loss:value()))
    print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
 
    criterion = nn.ParallelCriterion():add(nn.BCECriterion()) -- for the new spec. net
@@ -675,7 +746,7 @@ else
    -- }
 
    -- print("Stats on the test set:")
-   -- print(string.format("Loss: " .. lossfmt, avgloss:value()))
+   -- print(string.format("Loss: " .. lossfmt, hard_loss:value()))
    -- print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
 
 end
