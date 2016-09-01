@@ -621,33 +621,6 @@ else
       end
    )
 
-   -- create copy of specific nets with shared parametes for later saving
-   local for_saving = {
-      shared        = shared,
-      specific      = specific,
-      specific_old  = tnt.utils.table.foreach(
-         specific_old,
-         function(item)
-            return item:clone('weight', 'bias', 'running_mean', 'running_var')
-         end
-      )
-   }
-
-   stopper:setClosure(
-      function()
-         return {
-            shared = for_saving.shared:clone():clearState(),
-            specific = for_saving.specific:clone():clearState(),
-            specific_old = tnt.utils.table.foreach(
-               for_saving.specific_old,
-               function(item)
-                  return item:clone():clearState()
-               end
-            )
-         }
-      end
-   )
-
    -- modify old specific nets to output temperatured SoftMax
    tnt.utils.table.foreach(
       specific_old,
@@ -687,7 +660,7 @@ else
 
 
    _G.interrupted = false
-   gshared = shared()
+   gshared = {shared()}
    gspecific = {specific(gshared)}
    tnt.utils.table.foreach(
       specific_old,
@@ -696,8 +669,10 @@ else
       end
    )
 
+   local net = nn.gModule(gshared, gspecific)
+
    engine:train{
-      network  = nn.gModule({gshared}, gspecific),
+      network  = net,
       iterator =
          train_dataset
          :split({train = opts.split, valid = 1-opts.split}, 'train')
@@ -728,43 +703,58 @@ else
       }
    }
 
-   for_saving = stopper:getBestNet()
+   net = stopper:getBestNet()
+
+   engine:test{
+      network   = net,
+      iterator  = test_dataset
+         :batch(test_dataset:size(),
+               function(idx, size) return idx end,
+               function(table)
+                  table.input  = tnt.utils.table.mergetensor(table.input)
+                  table.target = tnt.transform.tablemergekeys()(table.target)
+                  table.target = tnt.transform.tableapply(
+                     function(field)
+                        if tnt.utils.table.canmergetensor(field) then
+                           return tnt.utils.table.mergetensor(field)
+                        else
+                           return field
+                        end
+                     end
+                  )(table.target)
+                  return table
+               end)
+         :iterator(),
+      criterion = criterion,
+   }
+
+   print("Stats on the test set:")
+   print(string.format("hard loss: " .. lossfmt, hard_loss:value()))
+   print(string.format("soft loss: " .. lossfmt, soft_loss:value()))
+   print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
 
    if cmdio.check_useragrees("Overwrite shared net '"
          .. opts.shared_path .. "'") then
-      torch.save(opts.shared_path, for_saving.shared)
+      torch.save(opts.shared_path, net.modules[1])
       print("File saved.")
    end
    if cmdio.check_useragrees("Overwrite specific net '"
          .. opts.specific_path .. "'") then
-      torch.save(opts.specific_path, for_saving.specific)
+      torch.save(opts.specific_path, net.modules[2])
       print("File saved.")
    end
 
    for i = 1, #args do
       if cmdio.check_useragrees("Overwrite old specific net '"
             .. args[i] .. "'") then
-         torch.save(args[i], for_saving.specific_old[i])
+         local module = net.modules[i+2]
+         module:remove()
+         if opts.n ~= 1 then module:remove() end
+         module:add(nn.Sigmoid())
+
+         torch.save(args[i], module)
          print("File saved.")
       end
    end
-
-   -- gshared = shared()
-   -- gspecific = {specific(gshared)}
-   -- tnt.utils.table.foreach(
-   --    specific_old,
-   --    function(item)
-   --       table.insert(gspecific, item(gshared))
-   --    end
-   -- )
-   -- engine:test{
-   --    network   = nn.Sequential():add(shared):add(specific),
-   --    iterator  = test_dataset:batch(test_dataset:size()):iterator(),
-   --    criterion = criterion,
-   -- }
-
-   -- print("Stats on the test set:")
-   -- print(string.format("Loss: " .. lossfmt, hard_loss:value()))
-   -- print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
 
 end
