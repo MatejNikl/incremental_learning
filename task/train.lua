@@ -69,6 +69,13 @@ Further description to fill in...]])
    }
 
    op:option{
+      "--lambda",
+      default = 10,
+      dest    = "lambda",
+      help    = "weight on soft target (hard target's weight = 1)",
+   }
+
+   op:option{
       "--optim",
       default = "adam",
       dest    = "optim",
@@ -87,6 +94,13 @@ Further description to fill in...]])
       default = "xavier",
       dest    = "weight_init",
       help    = "weight initialization mode: heuristic | xavier | xavier_caffe | kaiming",
+   }
+
+   op:option{
+      "--learning-rate",
+      default = 0.001,
+      dest    = "learning_rate",
+      help    = "learning rate to start with",
    }
 
    op:option{
@@ -133,10 +147,13 @@ Further description to fill in...]])
    check(opts.shared_path)
    check(opts.specific_path)
 
-   opts.split      = tonumber(opts.split)
-   opts.try_epochs = tonumber(opts.try_epochs)
-   opts.batch_size = tonumber(opts.batch_size)
-   opts.n          = tonumber(opts.n)
+   opts.split         = tonumber(opts.split)
+   opts.try_epochs    = tonumber(opts.try_epochs)
+   opts.batch_size    = tonumber(opts.batch_size)
+   opts.n             = tonumber(opts.n)
+   opts.lambda        = tonumber(opts.lambda)
+   opts.weight_decay  = tonumber(opts.weight_decay)
+   opts.learning_rate = tonumber(opts.learning_rate)
 
    return opts, args
 end
@@ -474,7 +491,7 @@ if #args == 0 then -- only the first specific + shared parameters to train
          optimMethod = optim[opts.optim],
          maxepoch    = math.huge,
          config      = {
-            learningRate = 0.001,
+            learningRate = opts.learning_rate,
             weightDecay  = opts.weight_decay,
          }
       }
@@ -576,7 +593,7 @@ else
       optimMethod = optim[opts.optim],
       maxepoch    = math.huge,
       config      = {
-         learningRate = 0.001,
+         learningRate = opts.learning_rate,
          weightDecay  = opts.weight_decay,
       }
    }
@@ -598,7 +615,8 @@ else
    local specific_old = tnt.utils.table.foreach(
       args,
       function(item)
-         criterion:add(nn.DistKLDivCriterion()) -- for each old spec. net
+         -- for each old spec. net add criterion
+         criterion:add(nn.DistKLDivCriterion(), opts.lambda/#args)
          return torch.load(item)
       end
    )
@@ -705,7 +723,7 @@ else
       optimMethod = optim[opts.optim],
       maxepoch    = math.huge,
       config      = {
-         learningRate = 0.001,
+         learningRate = opts.learning_rate,
          weightDecay  = opts.weight_decay,
       }
    }
