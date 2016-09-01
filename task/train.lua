@@ -218,7 +218,7 @@ local visual_check = argcheck{
       function(net, dataset)
          local w
          _G.interrupted = nil
-         for data in test_dataset:iterator()() do
+         for data in dataset:iterator()() do
             w = image.display{image=data.input:view(1, 64, 64), win = w}
             local a = net:forward(data.input):squeeze()
             local b = data.target
@@ -255,7 +255,7 @@ local extend_dataset = argcheck{
                local tmp = {data.target[i]}
 
                for j = 1, #sm do
-                  table.insert(tmp, sm[j][i])
+                  table.insert(tmp, sm[j][i]:clone())
                end
                -- tnt.utils.table.foreach(
                --    sm,
@@ -544,16 +544,6 @@ else
       )
    }
 
-   -- modify old specific nets to output temperatured SoftMax
-   tnt.utils.table.foreach(
-      specific_old,
-      function(item)
-         item:remove() -- remove last module
-         if opts.n ~= 1 then item:add(nn.MulConstant(1/opts.n)) end
-         item:add(nn.LogSoftMax())
-      end
-   )
-
    stopper:setClosure(
       function()
          return {
@@ -566,6 +556,16 @@ else
                end
             )
          }
+      end
+   )
+
+   -- modify old specific nets to output temperatured SoftMax
+   tnt.utils.table.foreach(
+      specific_old,
+      function(item)
+         item:remove() -- remove last module
+         if opts.n ~= 1 then item:add(nn.MulConstant(1/opts.n)) end
+         item:add(nn.SoftMax())
       end
    )
 
@@ -586,6 +586,16 @@ else
    test_dataset  = extend_dataset(test_dataset, preprocess_net)
 
    print("INCREMENTAL TRAINING...")
+
+   -- modify old specific nets to output temperatured LogSoftMax
+   tnt.utils.table.foreach(
+      specific_old,
+      function(item)
+         item:remove() -- remove last module
+         item:add(nn.LogSoftMax())
+      end
+   )
+
 
    _G.interrupted = false
    gshared = shared()
