@@ -264,41 +264,54 @@ local visual_check = argcheck{
       end
 }
 
-local extend_dataset = argcheck{
+local preprocess_dataset = argcheck{
    {name='dataset', type='tnt.Dataset'},
    {name='net', type='nn.Container'},
+   {name='save_as', type='string'},
+   {name='batch_size', type='number', opt=true},
    call =
-      function(dataset, net)
+      function(dataset, net, save_as, batch_size)
+         assert(save_as == 'input' or save_as == 'target',
+            "Only can save as input or as target")
+
+         batch_size = batch_size or dataset:size()
+         net:evaluate()
+
          local input  = {}
          local target = {}
 
-         net:evaluate()
+         for batch in dataset:batch(batch_size):iterator()() do
+            local net_output = net:forward(batch.input)
 
-         -- TODO MIGHT NOT WORK FOR SMALLER BATCH SIZES AS WELL???
-         for data in dataset:batch(dataset:size()):iterator()() do
-            local sm = net:forward(data.input)
+            if save_as == 'input' then
+               assert(type(net_output) == 'userdata')
 
-            if type(sm) ~= 'table' then sm = {sm} end
-
-            for i = 1, data.target:size(1) do
-               local tmp = {data.target[i]}
-
-               for j = 1, #sm do
-                  table.insert(tmp, sm[j][i]:clone())
+               for i = 1, batch.target:size(1) do
+                  table.insert(input, net_output[i]:clone())
+                  table.insert(target, batch.target[i])
                end
-               -- tnt.utils.table.foreach(
-               --    sm,
-               --    function(item)
-               --       table.insert(tmp, item[i])
-               --    end
-               -- )
+            else
+               if type(net_output) ~= 'table' then net_output = {net_output} end
+               for i = 1, batch.target:size(1) do
+                  local tmp = {batch.target[i]}
 
-               table.insert(input, data.input[i])
-               table.insert(target, tmp)
+                  for j = 1, #net_output do
+                     table.insert(tmp, net_output[j][i]:clone())
+                  end
+
+                  table.insert(input, batch.input[i])
+                  table.insert(target, tmp)
+               end
             end
          end
 
-         input = tnt.utils.table.mergetensor(input)
+         if tnt.utils.table.canmergetensor(input) then
+            input = tnt.utils.table.mergetensor(input)
+         end
+
+         if tnt.utils.table.canmergetensor(target) then
+            target = tnt.utils.table.mergetensor(target)
+         end
 
          return tnt.ListDataset{
             list = torch.range(1, dataset:size()):long(),
@@ -537,51 +550,10 @@ else
    local preprocessed_input = {}
    local target = {}
 
-   shared:evaluate()
 
    print("Pre-processing dataset for fine-tuning...")
+   preprocessed_dataset = preprocess_dataset(train_dataset, shared, 'input')
 
-   -- TODO DOES NOT WORK FOR SMALLER BATCH SIZE?!?!?!?!?!?!?
-   for data in train_dataset:batch(train_dataset:size()):iterator()() do
-      local a = shared:forward(data.input)
-      -- local a = data.input
-      for i = 1, data.input:size(1) do
-         table.insert(preprocessed_input, a[i])
-         table.insert(target, data.target[i])
-      end
-   end
-   preprocessed_input = tnt.utils.table.mergetensor(preprocessed_input)
-   target = tnt.utils.table.mergetensor(target)
-   local preprocessed_dataset = tnt.ListDataset{
-      list = torch.range(1, train_dataset:size()):long(),
-      load =
-         function(idx)
-            return {
-               input  = preprocessed_input[idx],
-               target = target[idx],
-            }
-         end,
-   }
-
-   -- local pre2 = train_dataset:transform(function(input) return shared:forward(input) end, 'input')
-
-   -- for i = 1, pre2:size() do
-   --    local ai = preprocessed_dataset:get(i).input
-   --    local bi = pre2:get(i).input
-   --    local at = preprocessed_dataset:get(i).target
-   --    local bt = pre2:get(i).target
-
-   --    if ai:eq(bi):min() == 0 then
-   --       print(ai)
-   --       print(bi)
-   --       error('inputs mismatch')
-   --    end
-   --    if at:eq(bt):min() == 0 then
-   --       print(at)
-   --       print(bt)
-   --       error('targets mismatch')
-   --    end
-   -- end
 
    print("Fine-tuning new specific net...")
 
@@ -592,7 +564,6 @@ else
          :split({train = opts.split, valid = 1-opts.split}, 'train')
          :shuffle()
          :batch(opts.batch_size)
-         -- :transform(function(input) return shared:forward(input) end, 'input')
          :iterator(),
       criterion   = criterion,
       optimMethod = optim[opts.optim],
@@ -649,8 +620,8 @@ else
 
    print("Saving old specific nets' outputs...")
 
-   train_dataset = extend_dataset(train_dataset, preprocess_net)
-   test_dataset  = extend_dataset(test_dataset, preprocess_net)
+   train_dataset = preprocess_dataset(train_dataset, preprocess_net, 'target')
+   test_dataset  = preprocess_dataset(test_dataset,  preprocess_net, 'target')
 
    print("INCREMENTAL TRAINING...")
 
