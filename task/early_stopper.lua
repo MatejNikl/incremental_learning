@@ -18,14 +18,18 @@ EarlyStopper.__init = argcheck{
 EarlyStopper.epoch = argcheck{
    {name="self", type="EarlyStopper"},
    {name="current_acc", type="number"},
+   {name="current_loss", type="number"},
    {name="net", type="nn.Container"},
    call =
-      function(self, current_acc, net)
+      function(self, current_acc, current_loss, net)
          self.is_reset = false
 
-         if current_acc > self.best_acc then
-            self.best_acc = current_acc
-            self.best_net = self.closure(net)
+         if (current_acc > self.best_acc)
+            or (current_acc == self.best_acc
+               and current_loss < self.best_loss) then
+            self.best_acc      = current_acc
+            self.best_loss     = current_loss
+            self.best_net      = self.closure(net)
             self.epochs_waited = 0
          else
             self.epochs_waited = self.epochs_waited + 1
@@ -65,8 +69,9 @@ EarlyStopper.reset = argcheck{
    call =
       function(self)
          EarlyStopper.resetEpochs(self)
-         self.best_net      = nil
-         self.best_acc      = -math.huge
+         self.best_net  = nil
+         self.best_acc  = -math.huge
+         self.best_loss = math.huge
       end
 }
 
