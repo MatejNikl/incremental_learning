@@ -239,20 +239,24 @@ local create_log = argcheck{
       end
 }
 
-local visualize_layer = argcheck{
-   {name='modules', type='table'},
+
+-- not local so that it can be called resursively
+visualize_layer = argcheck{
+   {name='net', type='nn.Container'},
    {name='window',  type='table', opt=true},
    {name='per_row', type='number', default=10},
 
    call =
-      function(modules, window, per_row)
+      function(net, window, per_row)
          local parameters
-         for _, module in ipairs(modules) do
+         for _, module in ipairs(net.modules) do
             if module.__typename == "nn.Linear"
                or module.__typename == "nn.LinearDropconnect" then
                local nunits = module.weight:size(1)
                parameters   = module.weight:view(nunits, 64, 64)
                break
+            elseif module.__typename == 'nn.Sequential' then
+               return visualize_layer(module, window, per_row) -- recursion
             end
          end
 
@@ -421,7 +425,7 @@ engine.hooks.onStart = function(state)
       log:flush()
 
       if opts.visualize then
-         visualize_window = visualize_layer(state.network.modules, visualize_window)
+         visualize_window = visualize_layer(state.network, visualize_window)
       end
    end
 end
@@ -488,7 +492,7 @@ engine.hooks.onEndEpoch = function(state)
 
 
    if opts.visualize then
-      visualize_window = visualize_layer(state.network.modules, visualize_window)
+      visualize_window = visualize_layer(state.network, visualize_window)
    end
 
    if stopper:shouldStop() then
