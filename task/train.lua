@@ -76,6 +76,20 @@ Further description to fill in...]])
    }
 
    op:option{
+      "--soft-crit",
+      default = "KLDiv",
+      dest    = "soft_crit",
+      help    = "criterion to use on soft target: KLDiv | Abs | MSE",
+   }
+
+   op:option{
+      "--finetune",
+      action  = "store_true",
+      dest    = "finetune",
+      help    = "perform finetuning of the new specific layer",
+   }
+
+   op:option{
       "--optim",
       default = "adam",
       dest    = "optim",
@@ -101,6 +115,12 @@ Further description to fill in...]])
       default = 0.001,
       dest    = "learning_rate",
       help    = "learning rate to start with",
+   }
+
+   op:option{
+      "--momentum",
+      dest    = "momentum",
+      help    = "momentum for sgd optim method",
    }
 
    op:option{
@@ -138,10 +158,6 @@ Further description to fill in...]])
       end
    end
 
-   if opts.seed then
-      torch.manualSeed(tonumber(opts.seed))
-   end
-
    check(opts.train_path)
    check(opts.test_path)
    check(opts.shared_path)
@@ -154,6 +170,17 @@ Further description to fill in...]])
    opts.lambda        = tonumber(opts.lambda)
    opts.weight_decay  = tonumber(opts.weight_decay)
    opts.learning_rate = tonumber(opts.learning_rate)
+   opts.momentum      = tonumber(opts.momentum)
+
+   if opts.soft_crit ~= 'KLDiv'
+      and opts.soft_crit ~= 'Abs'
+      and opts.soft_crit ~= 'MSE' then
+      op:error("Unknown soft criterion!")
+   end
+
+   if opts.seed then
+      torch.manualSeed(tonumber(opts.seed))
+   end
 
    return opts, args
 end
@@ -511,6 +538,7 @@ if #args == 0 then -- only the first specific + shared parameters to train
          config      = {
             learningRate = opts.learning_rate,
             weightDecay  = opts.weight_decay,
+            momentum     = opts.momentum,
          }
       }
 
@@ -543,48 +571,45 @@ if #args == 0 then -- only the first specific + shared parameters to train
    end
 else
    local train_dataset = torch.load(opts.train_path):shuffle()
-   criterion = nn.BCECriterion()
    specific  = require('weight-init')(specific, opts.weight_init)
    print(specific)
 
-   local preprocessed_input = {}
-   local target = {}
+   if opts.finetune then
+      criterion = nn.BCECriterion()
+      print("Pre-processing dataset for fine-tuning...")
+      local preprocessed_dataset = preprocess_dataset(train_dataset, shared, 'input')
+      print("Fine-tuning new specific net...")
 
-
-   print("Pre-processing dataset for fine-tuning...")
-   preprocessed_dataset = preprocess_dataset(train_dataset, shared, 'input')
-
-
-   print("Fine-tuning new specific net...")
-
-   engine:train{
-      network  = specific,
-      iterator =
-         preprocessed_dataset
-         :split({train = opts.split, valid = 1-opts.split}, 'train')
-         :shuffle()
-         :batch(opts.batch_size)
-         :iterator(),
-      criterion   = criterion,
-      optimMethod = optim[opts.optim],
-      maxepoch    = math.huge,
-      config      = {
-         learningRate = opts.learning_rate,
-         weightDecay  = opts.weight_decay,
+      engine:train{
+         network  = specific,
+         iterator =
+            preprocessed_dataset
+            :split({train = opts.split, valid = 1-opts.split}, 'train')
+            :shuffle()
+            :batch(opts.batch_size)
+            :iterator(),
+         criterion   = criterion,
+         optimMethod = optim[opts.optim],
+         maxepoch    = math.huge,
+         config      = {
+            learningRate = opts.learning_rate,
+            weightDecay  = opts.weight_decay,
+            momentum     = opts.momentum,
+         }
       }
-   }
 
-   specific = stopper:getBestNet()
+      specific = stopper:getBestNet()
 
-   engine:test{
-      network   = nn.Sequential():add(shared):add(specific),
-      iterator  = test_dataset:batch(test_dataset:size()):iterator(),
-      criterion = criterion,
-   }
+      engine:test{
+         network   = nn.Sequential():add(shared):add(specific),
+         iterator  = test_dataset:batch(test_dataset:size()):iterator(),
+         criterion = criterion,
+      }
 
-   print("Stats on the test set:")
-   print(string.format("Loss: " .. lossfmt, hard_loss:value()))
-   print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
+      print("Stats on the test set:")
+      print(string.format("Loss: " .. lossfmt, hard_loss:value()))
+      print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
+   end
 
    criterion = nn.ParallelCriterion():add(nn.BCECriterion()) -- for the new spec. net
 
@@ -592,20 +617,31 @@ else
       args,
       function(item)
          -- for each old spec. net add criterion
-         criterion:add(nn.DistKLDivCriterion(), opts.lambda/#args)
+         local crit
+         if opts.soft_crit == "KLDiv" then
+            criterion:add(nn.DistKLDivCriterion(), opts.lambda/#args)
+         elseif opts.soft_crit == "Abs" then
+            criterion:add(nn.AbsCriterion(), opts.lambda/#args)
+         elseif opts.soft_crit == "MSE" then
+            criterion:add(nn.MSECriterion(), opts.lambda/#args)
+         end
+
+         -- and return loaded spec net
          return torch.load(item)
       end
    )
 
-   -- modify old specific nets to output temperatured SoftMax
-   tnt.utils.table.foreach(
-      specific_old,
-      function(item)
-         item:remove() -- remove last module
-         if opts.n ~= 1 then item:add(nn.MulConstant(1/opts.n)) end
-         item:add(nn.SoftMax())
-      end
-   )
+   if opts.soft_crit == "KLDiv" then
+      -- modify old specific nets to output temperatured SoftMax
+      tnt.utils.table.foreach(
+         specific_old,
+         function(item)
+            item:remove() -- remove last module
+            if opts.n ~= 1 then item:add(nn.MulConstant(1/opts.n)) end
+            item:add(nn.SoftMax())
+         end
+      )
+   end
 
    gshared = shared()
    local preprocess_net = nn.gModule(
@@ -625,15 +661,16 @@ else
 
    print("INCREMENTAL TRAINING...")
 
-   -- modify old specific nets to output temperatured LogSoftMax
-   tnt.utils.table.foreach(
-      specific_old,
-      function(item)
-         item:remove() -- remove last module
-         item:add(nn.LogSoftMax())
-      end
-   )
-
+   if opts.soft_crit == "KLDiv" then
+      -- modify old specific nets to output temperatured LogSoftMax
+      tnt.utils.table.foreach(
+         specific_old,
+         function(item)
+            item:remove() -- remove last module
+            item:add(nn.LogSoftMax())
+         end
+      )
+   end
 
    _G.interrupted = false
    gshared = {shared()}
@@ -676,6 +713,7 @@ else
       config      = {
          learningRate = opts.learning_rate,
          weightDecay  = opts.weight_decay,
+         momentum     = opts.momentum,
       }
    }
 
@@ -724,9 +762,11 @@ else
       if cmdio.check_useragrees("Overwrite old specific net '"
             .. args[i] .. "'") then
          local module = net.modules[i+2]
-         module:remove()
-         if opts.n ~= 1 then module:remove() end
-         module:add(nn.Sigmoid())
+         if opts.soft_crit == "KLDiv" then
+            module:remove()
+            if opts.n ~= 1 then module:remove() end
+            module:add(nn.Sigmoid())
+         end
 
          torch.save(args[i], module)
          print("File saved.")
