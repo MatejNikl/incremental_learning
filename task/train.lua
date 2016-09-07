@@ -14,36 +14,37 @@ require 'earlystopper'
 require 'exactmatchmeter'
 
 local function parse_args(args)
-   local op = xlua.OptionParser("train.lua --train TRAIN_DATASET"
-      .. " --test TEST_DATASET --shared SHARED_NN --secific SPECIFIC_NN"
+   local op = xlua.OptionParser("train.lua --task SCT[1-6] --net-dir .../net_dir"
+      .. " [--train-dir .../train_dir] --test-dir .../test_dir"
       .. " [OPTIONS...] PREVIOUSLY_TRAINED_SPECIFIC_NNs...\n\n"
       .. [[
 Further description to fill in...]])
 
    op:option{
-      "--train",
-      dest = "train_path",
-      help = "a training datafile",
-   }
-
-   op:option{
-      "--test",
-      dest = "test_path",
-      help = "a testing datafile",
+      "--task",
+      dest = "task",
+      help = "a name of the new task to learn [or the task to test if"
+         .. " --train-dir is not present]",
       req  = true,
    }
 
    op:option{
-      "--shared",
-      dest = "shared_path",
-      help = "a previously created shared part of the nn",
-      req = true,
+      "--net-dir",
+      dest = "net_dir",
+      help = "a directory containing parts of the whole nn",
+      req  = true,
    }
 
    op:option{
-      "--specific",
-      dest = "specific_path",
-      help = "a previously created specific part of the nn",
+      "--train-dir",
+      dest = "train_dir",
+      help = "a directory containing train datasets",
+   }
+
+   op:option{
+      "--test-dir",
+      dest = "test_dir",
+      help = "a directory containing test datasets",
       req = true,
    }
 
@@ -56,7 +57,7 @@ Further description to fill in...]])
 
    op:option{
       "--try-epochs",
-      default = 5,
+      default = 10,
       dest    = "try_epochs",
       help    = "keep trying for # epochs to find better parameters (early stopping)",
    }
@@ -93,7 +94,7 @@ Further description to fill in...]])
       "--optim",
       default = "adam",
       dest    = "optim",
-      help    = "optimization method: sgd | adam | adadelta | adagrad | adamax",
+      help    = "optimization method: sgd | adam | lbfgs | any other method in optim"
    }
 
    op:option{
@@ -107,7 +108,7 @@ Further description to fill in...]])
       "--weight-init",
       default = "xavier",
       dest    = "weight_init",
-      help    = "weight initialization mode: heuristic | xavier | xavier_caffe | kaiming",
+      help    = "weight initialization mode: xavier | heuristic | xavier_caffe | kaiming",
    }
 
    op:option{
