@@ -150,6 +150,12 @@ Further description to fill in...]])
       help = "manual seed for experiment repeatability",
    }
 
+   op:option{
+      "--log",
+      dest = "log",
+      help = "where to write the log file",
+   }
+
    local opts, args = op:parse()
 
    local function check(path)
@@ -188,7 +194,7 @@ end
 local lossfmt = '%8.6f'
 local accfmt  = '%6.2f%%'
 local create_log = argcheck{
-   {name='path', type='string', default='log.txt'},
+   {name='path', type='string', default='/dev/null'},
    call =
       function(path)
          local logkeys = {
@@ -364,7 +370,7 @@ sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
 
-local log       = create_log()
+local log       = create_log(opts.log)
 local engine    = tnt.OptimEngine()
 local hard_loss = tnt.AverageValueMeter()
 local soft_loss = tnt.AverageValueMeter()
