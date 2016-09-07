@@ -10,7 +10,7 @@ local nngraph  = require 'nngraph'
 
 
 require 'dropconnect'
-require 'early_stopper'
+require 'earlystopper'
 require 'exactmatchmeter'
 
 local function parse_args(args)
