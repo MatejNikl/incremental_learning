@@ -14,6 +14,18 @@ require 'earlystopper'
 require 'exactmatchmeter'
 
 local function parse_args(args)
+   local function print_settings(op)
+      local lines = {}
+      string.gsub(op:tostring(), "(%S* = %S*)", function(a) table.insert(lines, a) end)
+      table.sort(lines)
+
+      print("\nSettings for this experiment:")
+      for _, line in ipairs(lines) do
+         print("+ " .. line)
+      end
+      print()
+   end
+
    local op = xlua.OptionParser("train.lua --task SCT[1-6] --net-dir .../net_dir"
       .. " [--train-dir .../train_dir] --test-dir .../test_dir"
       .. " [OPTIONS...] ALREADY_TRAINED_TASKS...\n\n"
@@ -185,6 +197,8 @@ Further description to fill in...]])
       end
    )
 
+   print_settings(op)
+
    return opts, args
 end
 
@@ -245,12 +259,12 @@ local create_log = argcheck{
 
 -- not local so that it can be called resursively
 visualize_layer = argcheck{
+   {name='path',  type='string'},
    {name='net', type='nn.Container'},
-   {name='window',  type='table', opt=true},
    {name='per_row', type='number', default=10},
 
    call =
-      function(net, window, per_row)
+      function(path, net, per_row)
          local parameters
          for _, module in ipairs(net.modules) do
             if module.__typename == "nn.Linear"
@@ -259,18 +273,17 @@ visualize_layer = argcheck{
                parameters   = module.weight:view(nunits, 64, 64)
                break
             elseif module.__typename == 'nn.Sequential' then
-               return visualize_layer(module, window, per_row) -- recursion
+               return visualize_layer(path, module, per_row) -- recursion
             end
          end
 
-         return image.display{
-            image = image.toDisplayTensor{
+         image.save(path,
+            image.toDisplayTensor{
                input   = parameters,
                nrow    = per_row,
-               padding = 1},
-            zoom = 2,
-            win  = window
-         }
+               padding = 1
+            }
+         )
       end
 }
 
@@ -394,7 +407,6 @@ engine.hooks.onStartEpoch = function(state)
    timer:reset()
 end
 
-local visualize_window
 engine.hooks.onStart = function(state)
    if state.training then
       stopper:reset()
@@ -440,7 +452,9 @@ engine.hooks.onStart = function(state)
       log:flush()
 
       if opts.visualize then
-         visualize_window = visualize_layer(state.network, visualize_window)
+         local path = paths.concat(opts.net_dir, opts.task
+                                                .. "_" .. state.epoch .. ".png")
+         visualize_layer(path, state.network)
       end
    end
 end
@@ -500,7 +514,9 @@ engine.hooks.onEndEpoch = function(state)
 
 
    if opts.visualize then
-      visualize_window = visualize_layer(state.network, visualize_window)
+      local path = paths.concat(opts.net_dir, opts.task
+                                              .. "_" .. state.epoch .. ".png")
+      visualize_layer(path, state.network)
    end
 
    if stopper:shouldStop() then
@@ -514,7 +530,6 @@ engine.hooks.onEndEpoch = function(state)
    end
 
    if stopper:shouldStop() or _G.interrupted then
-      if visualize_window then visualize_window.window:close() end
       state.maxepoch = 0 -- end training
    end
 end
@@ -569,6 +584,7 @@ if #args == 0 then -- only the first specific + shared parameters to train
    log:status("Stats on the test set:")
    log:set{
       train_hardloss = hard_loss:value(),
+      train_softloss = soft_loss:value(),
       train_acc      = emmeter:value() * 100,
    }
    log:flush()
@@ -624,6 +640,7 @@ else
       log:status("Stats on the test set:")
       log:set{
          train_hardloss = hard_loss:value(),
+         train_softloss = soft_loss:value(),
          train_acc      = emmeter:value() * 100,
       }
       log:flush()
@@ -768,6 +785,7 @@ else
 
          write(args[i], module)
       end
+
       write(specific_path, net.modules[2])
       write(shared_path, net.modules[1])
    end
