@@ -65,6 +65,10 @@ local function w_init(net, arg)
          m:reset(method(m.weight:size(2), m.weight:size(1)))
       end
 
+      if m.modules then
+         w_init(m, arg)
+      end
+
       if m.bias then
          m.bias:zero()
       end
