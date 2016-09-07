@@ -16,7 +16,7 @@ require 'exactmatchmeter'
 local function parse_args(args)
    local op = xlua.OptionParser("train.lua --task SCT[1-6] --net-dir .../net_dir"
       .. " [--train-dir .../train_dir] --test-dir .../test_dir"
-      .. " [OPTIONS...] PREVIOUSLY_TRAINED_SPECIFIC_NNs...\n\n"
+      .. " [OPTIONS...] ALREADY_TRAINED_TASKS...\n\n"
       .. [[
 Further description to fill in...]])
 
@@ -154,21 +154,10 @@ Further description to fill in...]])
    op:option{
       "--log",
       dest = "log",
-      help = "where to write the log file",
+      help = "name of the log file (inside --net-dir)",
    }
 
    local opts, args = op:parse()
-
-   local function check(path)
-      if path and not paths.filep(path) then
-         op:fail("The '" .. path .. "' file does not exist!")
-      end
-   end
-
-   check(opts.train_path)
-   check(opts.test_path)
-   check(opts.shared_path)
-   check(opts.specific_path)
 
    opts.split         = tonumber(opts.split)
    opts.try_epochs    = tonumber(opts.try_epochs)
@@ -188,6 +177,13 @@ Further description to fill in...]])
    if opts.seed then
       torch.manualSeed(tonumber(opts.seed))
    end
+
+   args = tnt.utils.table.foreach(
+      args,
+      function(a)
+         return paths.concat(opts.net_dir, a) .. ".t7"
+      end
+   )
 
    return opts, args
 end
@@ -381,7 +377,9 @@ sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
 
-local log       = create_log(opts.log)
+local logpath   = paths.concat(opts.net_dir,
+                               opts.log and opts.log or opts.task .. ".txt")
+local log       = create_log(logpath)
 local engine    = tnt.OptimEngine()
 local hard_loss = tnt.AverageValueMeter()
 local soft_loss = tnt.AverageValueMeter()
@@ -521,12 +519,14 @@ engine.hooks.onEndEpoch = function(state)
    end
 end
 
--- local criterion
+local criterion
 local net
-local shared    = torch.load(opts.shared_path)
-local specific  = torch.load(opts.specific_path)
+local shared_path   = paths.concat(opts.net_dir, "shared.t7")
+local specific_path = paths.concat(opts.net_dir, opts.task) .. ".t7"
+local shared        = torch.load(shared_path)
+local specific      = torch.load(specific_path)
 
-local test_dataset  = torch.load(opts.test_path)
+local test_dataset = torch.load(paths.concat(opts.test_dir, opts.task) .. ".t7")
 
 if #args == 0 then -- only the first specific + shared parameters to train
    criterion = nn.BCECriterion()
@@ -535,8 +535,9 @@ if #args == 0 then -- only the first specific + shared parameters to train
 
    print(net)
 
-   if opts.train_path then
-      local train_dataset = torch.load(opts.train_path):shuffle()
+   if opts.train_dir then
+      local train_path = paths.concat(opts.train_dir, opts.task) .. ".t7"
+      local train_dataset = torch.load(train_path):shuffle()
       net = require('weight-init')(net, opts.weight_init)
       engine:train{
          network     = net,
@@ -576,14 +577,15 @@ if #args == 0 then -- only the first specific + shared parameters to train
       visual_check(net, test_dataset)
    end
 
-   if opts.train_path then
+   if opts.train_dir then
       if cmdio.check_useragrees("Write trained nets") then
-         write(opts.specific_path, net.modules[2])
-         write(opts.shared_path, net.modules[1])
+         write(specific_path, net.modules[2])
+         write(shared_path, net.modules[1])
       end
    end
 else
-   local train_dataset = torch.load(opts.train_path):shuffle()
+   local train_path = paths.concat(opts.train_dir, opts.task) .. ".t7"
+   local train_dataset = torch.load(train_path):shuffle()
    specific  = require('weight-init')(specific, opts.weight_init)
    print(specific)
 
@@ -766,7 +768,7 @@ else
 
          write(args[i], module)
       end
-      write(opts.specific_path, net.modules[2])
-      write(opts.shared_path, net.modules[1])
+      write(specific_path, net.modules[2])
+      write(shared_path, net.modules[1])
    end
 end
