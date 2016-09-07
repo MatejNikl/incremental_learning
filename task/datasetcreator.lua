@@ -121,7 +121,7 @@ for fn in lfs.dir(opts.dir) do
          error("All targets must have the same size!")
       end
 
-      table.insert(input_table, input:view(input:nElement())) -- 1x64x64 --> 4096
+      table.insert(input_table, input)
       table.insert(target_table, target)
    end
 
@@ -141,17 +141,8 @@ if not _G.interrupted then
       return
    end
 
-   local function table_to_tensor(input)
-      local output = torch.Tensor(#input, input[1]:nElement())
-      for i, val in ipairs(input) do
-         output[{{i}, {}}] = val
-      end
-
-      return output
-   end
-
-   local input  = table_to_tensor(input_table)
-   local target = table_to_tensor(target_table)
+   local input  = tnt.utils.table.mergetensor(input_table)
+   local target = tnt.utils.table.mergetensor(target_table)
 
    local mean = opts.mean and opts.mean or input:mean()
    local std  = opts.std and opts.std or input:std()

@@ -17,8 +17,8 @@ for dir in "$@"; do
     fi
 
     echo -e "\n"
-    echo th dataset_creator.lua --csv "$dir/labels.csv" --dir "$dir" "${dir}.t7" | tee $temp
-    th dataset_creator.lua --csv "$dir/labels.csv" --dir "$dir" "${dir}.t7" | tee $temp
+    echo th datasetcreator.lua --csv "$dir/labels.csv" --dir "$dir" "${dir}.t7" | tee $temp
+    th datasetcreator.lua --csv "$dir/labels.csv" --dir "$dir" "${dir}.t7" | tee $temp
 
     mean=`sed -n 's/^mean: \([0-9]\+.[0-9]\+\)/\1/p' $temp`
     std=`sed -n 's/^std:  \([0-9]\+.[0-9]\+\)/\1/p' $temp`
@@ -30,8 +30,8 @@ for dir in "$@"; do
     fi
 
     echo
-    echo th dataset_creator.lua --csv "$dir/labels.csv" --dir "$dir" --mean $mean --std $std "${dir}.t7"
-    th dataset_creator.lua --csv "$dir/labels.csv" --dir "$dir" --mean $mean --std $std "${dir}.t7"
+    echo th datasetcreator.lua --csv "$dir/labels.csv" --dir "$dir" --mean $mean --std $std "${dir}.t7"
+    th datasetcreator.lua --csv "$dir/labels.csv" --dir "$dir" --mean $mean --std $std "${dir}.t7"
 done
 
 rm $temp

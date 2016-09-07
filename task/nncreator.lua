@@ -89,6 +89,10 @@ local function create_net(opts, shared)
    local net = nn.Sequential()
    local bias = not opts.batchnorm
 
+   if shared then
+      net:add(nn.View(-1):setNumInputDims(2))
+   end
+
    for i = 2, #opts.layers do
       local nprev = opts.layers[i-1]
       local ncurr = opts.layers[i]
