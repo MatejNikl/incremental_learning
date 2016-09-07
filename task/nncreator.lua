@@ -155,7 +155,7 @@ for _, path in ipairs(args) do
       local nn = create_net(opts, opts.use_shared == nil)
       print(nn)
 
-      local filename = (opts.use_shared and "" or "shared_") .. paths.basename(path)
+      local filename = opts.use_shared and paths.basename(path) or "shared.t7"
       local fullpath = paths.concat(opts.dir, filename)
 
       local write = true
