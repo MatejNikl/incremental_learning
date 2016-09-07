@@ -363,6 +363,16 @@ local preprocess_dataset = argcheck{
       end
 }
 
+local write = argcheck{
+   {name='where', type='string'},
+   {name='what', type='nn.Container'},
+   call =
+      function(where, what)
+         torch.save(where, what)
+         print("File '" .. where .. "' saved.")
+      end
+}
+
 
 -- [[MAIN BEGINS HERE ]]----
 
@@ -388,7 +398,7 @@ end
 local visualize_window
 engine.hooks.onStart = function(state)
    if state.training then
-      stopper:resetEpochs()
+      stopper:reset()
       hard_loss:reset()
       soft_loss:reset()
       emmeter:reset()
@@ -554,22 +564,21 @@ if #args == 0 then -- only the first specific + shared parameters to train
       criterion = criterion,
    }
 
-   print("Stats on the test set:")
-   print(string.format("Loss: " .. lossfmt, hard_loss:value()))
-   print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
+   log:status("Stats on the test set:")
+   log:set{
+      train_hardloss = hard_loss:value(),
+      train_acc      = emmeter:value() * 100,
+   }
+   log:flush()
 
    if opts.visual_check then
       visual_check(net, test_dataset)
    end
 
    if opts.train_path then
-      if cmdio.check_useragrees("Overwrite shared net") then
-         torch.save(opts.shared_path, net.modules[1])
-         print("File '" .. opts.shared_path .. "' saved.")
-      end
-      if cmdio.check_useragrees("Overwrite specific net") then
-         torch.save(opts.specific_path, net.modules[2])
-         print("File '" .. opts.specific_path .. "' saved.")
+      if cmdio.check_useragrees("Write trained nets") then
+         write(opts.specific_path, net.modules[2])
+         write(opts.shared_path, net.modules[1])
       end
    end
 else
@@ -579,9 +588,9 @@ else
 
    if opts.finetune then
       criterion = nn.BCECriterion()
-      print("Pre-processing dataset for fine-tuning...")
+      log:status("Pre-processing dataset for fine-tuning...")
       local preprocessed_dataset = preprocess_dataset(train_dataset, shared, 'input')
-      print("Fine-tuning new specific net...")
+      log:status("Fine-tuning new specific net...")
 
       engine:train{
          network  = specific,
@@ -609,9 +618,12 @@ else
          criterion = criterion,
       }
 
-      print("Stats on the test set:")
-      print(string.format("Loss: " .. lossfmt, hard_loss:value()))
-      print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
+      log:status("Stats on the test set:")
+      log:set{
+         train_hardloss = hard_loss:value(),
+         train_acc      = emmeter:value() * 100,
+      }
+      log:flush()
    end
 
    criterion = nn.ParallelCriterion():add(nn.BCECriterion()) -- for the new spec. net
@@ -657,12 +669,12 @@ else
       )
    )
 
-   print("Saving old specific nets' outputs...")
+   log:status("Saving old specific nets' outputs...")
 
    train_dataset = preprocess_dataset(train_dataset, preprocess_net, 'target')
    test_dataset  = preprocess_dataset(test_dataset,  preprocess_net, 'target')
 
-   print("INCREMENTAL TRAINING...")
+   log:status("INCREMENTAL TRAINING...")
 
    if opts.soft_crit == "KLDiv" then
       -- modify old specific nets to output temperatured LogSoftMax
@@ -687,6 +699,21 @@ else
 
    local net = nn.gModule(gshared, gspecific)
 
+   local function mergefunc(table)
+      table.input  = tnt.utils.table.mergetensor(table.input)
+      table.target = tnt.transform.tablemergekeys()(table.target)
+      table.target = tnt.transform.tableapply(
+         function(field)
+            if tnt.utils.table.canmergetensor(field) then
+               return tnt.utils.table.mergetensor(field)
+            else
+               return field
+            end
+         end
+      )(table.target)
+      return table
+   end
+
    engine:train{
       network  = net,
       iterator =
@@ -695,20 +722,7 @@ else
          :shuffle()
          :batch(opts.batch_size,
                function(idx, size) return idx end,
-               function(table)
-                  table.input  = tnt.utils.table.mergetensor(table.input)
-                  table.target = tnt.transform.tablemergekeys()(table.target)
-                  table.target = tnt.transform.tableapply(
-                     function(field)
-                        if tnt.utils.table.canmergetensor(field) then
-                           return tnt.utils.table.mergetensor(field)
-                        else
-                           return field
-                        end
-                     end
-                  )(table.target)
-                  return table
-               end)
+               mergefunc)
          :iterator(),
       criterion   = criterion,
       optimMethod = optim[opts.optim],
@@ -727,43 +741,21 @@ else
       iterator  = test_dataset
          :batch(test_dataset:size(),
                function(idx, size) return idx end,
-               function(table)
-                  table.input  = tnt.utils.table.mergetensor(table.input)
-                  table.target = tnt.transform.tablemergekeys()(table.target)
-                  table.target = tnt.transform.tableapply(
-                     function(field)
-                        if tnt.utils.table.canmergetensor(field) then
-                           return tnt.utils.table.mergetensor(field)
-                        else
-                           return field
-                        end
-                     end
-                  )(table.target)
-                  return table
-               end)
+               mergefunc)
          :iterator(),
       criterion = criterion,
    }
 
-   print("Stats on the test set:")
-   print(string.format("hard loss: " .. lossfmt, hard_loss:value()))
-   print(string.format("soft loss: " .. lossfmt, soft_loss:value()))
-   print(string.format("Acc: " .. accfmt, emmeter:value() * 100))
+   log:status("Stats on the test set:")
+   log:set{
+      train_hardloss = hard_loss:value(),
+      train_softloss = soft_loss:value(),
+      train_acc      = emmeter:value() * 100,
+   }
+   log:flush()
 
-   if cmdio.check_useragrees("Overwrite shared net '"
-         .. opts.shared_path .. "'") then
-      torch.save(opts.shared_path, net.modules[1])
-      print("File saved.")
-   end
-   if cmdio.check_useragrees("Overwrite specific net '"
-         .. opts.specific_path .. "'") then
-      torch.save(opts.specific_path, net.modules[2])
-      print("File saved.")
-   end
-
-   for i = 1, #args do
-      if cmdio.check_useragrees("Overwrite old specific net '"
-            .. args[i] .. "'") then
+   if cmdio.check_useragrees("Write trained nets") then
+      for i = 1, #args do
          local module = net.modules[i+2]
          if opts.soft_crit == "KLDiv" then
             module:remove()
@@ -771,9 +763,9 @@ else
             module:add(nn.Sigmoid())
          end
 
-         torch.save(args[i], module)
-         print("File saved.")
+         write(args[i], module)
       end
+      write(opts.specific_path, net.modules[2])
+      write(opts.shared_path, net.modules[1])
    end
-
 end
