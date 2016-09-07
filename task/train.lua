@@ -432,19 +432,12 @@ end
 
 engine.hooks.onForwardCriterion = function(state)
    if type(state.network.output) == 'table' then
-      local total_loss = 0
-      local crits   = state.criterion.criterions
-      local weights = state.criterion.weights
-      for i = 2, #crits do
-         total_loss = total_loss + crits[i].output * weights[i]
-      end
-
-      hard_loss:add(crits[1].output)
-      soft_loss:add(total_loss)
+      local hl = state.criterion.criterions[1].output
+      hard_loss:add(hl)
+      soft_loss:add(state.criterion.output - hl)
       emmeter:add(state.network.output[1], state.sample.target[1])
    else
       hard_loss:add(state.criterion.output)
-      soft_loss:add(0/0)
       emmeter:add(state.network.output, state.sample.target)
    end
 end
