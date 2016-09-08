@@ -4,6 +4,7 @@ local argcheck = require 'argcheck'
 local nn       = require 'nn'
 local tnt      = require 'torchnet'
 
+require 'common'
 require 'dropconnect'
 
 local function parse_args(args)

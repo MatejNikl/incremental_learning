@@ -7,6 +7,7 @@ local lfs  = require 'lfs'
 local tnt  = require 'torchnet'
 local xlua = require 'xlua' -- opts parser, progress bar
 
+require 'common'
 
 local function parse_args(args)
    local op = xlua.OptionParser("dataset_creator.lua --csv=CSV --dir=DIR"

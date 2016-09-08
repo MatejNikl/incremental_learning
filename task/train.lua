@@ -8,10 +8,11 @@ local optim    = require 'optim'
 local tnt      = require 'torchnet'
 local nngraph  = require 'nngraph'
 
-
+require 'common'
 require 'dropconnect'
 require 'earlystopper'
 require 'exactmatchmeter'
+
 
 local function parse_args(args)
    local function print_settings(op)
