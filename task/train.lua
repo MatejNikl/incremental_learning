@@ -320,7 +320,7 @@ local visual_check = argcheck{
             w = image.display{image=data.input:view(1, 64, 64), win = w}
             local a = net:forward(data.input):squeeze()
             local b = data.target
-            a = torch.cat(a, a:ge(0.5):double(), 2)
+            -- a = torch.cat(a, a:ge(0.5):double(), 2)
             print(torch.cat(a, b, 2):t())
             print("Press enter to load next example...")
             io.read()

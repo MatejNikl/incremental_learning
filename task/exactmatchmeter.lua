@@ -25,9 +25,10 @@ The optional variable `threshold` defines how the `output` is interpreted:
    values <  `threshold` -> 0
 ]],
    {name="self", type="tnt.EMMeter"},
-   {name="threshold", type="number", default=0.5},
    call = function(self, threshold)
-      self.threshold = threshold
+      self.temp    = torch.Tensor()
+      self.sorted  = torch.Tensor()
+      self.indices = torch.LongTensor()
       self:reset()
    end
 }
@@ -71,11 +72,16 @@ EMMeter.add = argcheck{
          'targets should be binary (0 or 1)'
       )
 
-      self.matched = self.matched + output
-         :ge(self.threshold)
-         :eq(target:byte())
-         :min(2)
-         :sum()
+      torch.sort(self.sorted, self.indices, output, 2, false)
+      self.temp:resizeAs(target):zero()
+
+      local n = self.indices:size(2)/2
+
+      for i = 1, self.indices:size(1) do
+         self.temp[i] = output[i]:ge(self.sorted[i][n+1])
+      end
+
+      self.matched = self.matched + self.temp:eq(target):min(2):sum()
       self.n = self.n + target:size(1)
    end
 }

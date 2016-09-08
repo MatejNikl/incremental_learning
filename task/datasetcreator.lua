@@ -111,6 +111,7 @@ for fn in lfs.dir(opts.dir) do
       local input = img.load(path, 1)
       local target = torch.Tensor(csv_data[total])
       target = target[target:ne(opts.dont_care)]
+      target = torch.cat(target, target:eq(0):typeAs(target))
 
       input_dims = check_sizes(input:size(), input_dims)
       target_dims = check_sizes(target:size(), target_dims)
