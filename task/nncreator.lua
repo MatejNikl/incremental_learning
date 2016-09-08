@@ -22,6 +22,13 @@ the previously created shared part to create a specific part of the nn,
 that can be used with the shared part and the specified dataset.]])
 
    op:option{
+      "--conv",
+      action = "store_true",
+      dest   = "conv",
+      help   = "create fixed architecture convolutional (shared) part",
+   }
+
+   op:option{
       "--use-shared",
       dest   = "use_shared",
       help   = "a previously created shared part",
@@ -122,6 +129,29 @@ local function create_net(opts, shared)
    return net
 end
 
+local function create_convnet()
+   net = nn.Sequential()
+
+   net:add(nn.SpatialConvolution(1,8, 3,3, 1,1, 1,1))
+   net:add(nn.ReLU(true))
+   net:add(nn.SpatialMaxPooling(2,2,2,2))
+
+   net:add(nn.SpatialConvolution(8,8, 3,3, 1,1, 1,1))
+   net:add(nn.ReLU(true))
+   net:add(nn.SpatialMaxPooling(2,2,2,2))
+
+   net:add(nn.SpatialConvolution(8,8, 3,3, 1,1, 1,1))
+   net:add(nn.ReLU(true))
+   net:add(nn.SpatialMaxPooling(2,2,2,2))
+
+   net:add(nn.View(-1):setNumInputDims(3))
+
+   net:add(nn.Linear(512, 64))
+   net:add(nn.ReLU(true))
+
+   return net
+end
+
 local function get_output_size(nn_path)
    local nn = torch.load(nn_path)
 
@@ -157,7 +187,7 @@ for _, path in ipairs(args) do
          opts.layers[1] = ds:get(1).input:nElement()
       end
 
-      local nn = create_net(opts, opts.use_shared == nil)
+      local nn = opts.conv and create_convnet() or create_net(opts, opts.use_shared == nil)
       print(nn)
 
       local filename = opts.use_shared and paths.basename(path) or "shared.t7"
