@@ -6,7 +6,7 @@ EarlyStopper.__init = argcheck{
    {name="self", type="EarlyStopper"},
    {name="try_epochs", type="number"},
    {name="closure", type="function", help="a function that returns copy of the current best net",
-      default=function(net) return net:clone():clearState() end},
+      default=function(net) return net:clearState():clone() end},
    call =
       function(self, try_epochs, closure)
          self.try_epochs = try_epochs
