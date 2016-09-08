@@ -209,19 +209,6 @@ local create_log = argcheck{
    {name='path', type='string', default='/dev/null'},
    call =
       function(path)
-         local logkeys = {
-            'epoch',
-            'train_hardloss',
-            'train_softloss',
-            'train_acc',
-            'valid_hardloss',
-            'valid_softloss',
-            'valid_acc',
-            'learn_rate',
-            'epoch_time',
-            'new_best',
-         }
-
          local logtext   = require 'torchnet.log.view.text'
          local logstatus = require 'torchnet.log.view.status'
 
@@ -238,18 +225,52 @@ local create_log = argcheck{
             '%s'}
 
          return tnt.Log{
-            keys = logkeys,
+            keys = {
+               'epoch',
+               'train_hardloss',
+               'train_softloss',
+               'train_acc',
+               'valid_hardloss',
+               'valid_softloss',
+               'valid_acc',
+               'learn_rate',
+               'epoch_time',
+               'total_time',
+               'new_best',
+            },
             onSet = {
                logstatus{}
             },
             onFlush = {
                logtext{
-                  keys   = logkeys,
+                  keys   = {
+                     'epoch',
+                     'train_hardloss',
+                     'train_softloss',
+                     'train_acc',
+                     'valid_hardloss',
+                     'valid_softloss',
+                     'valid_acc',
+                     'learn_rate',
+                     'epoch_time',
+                     'new_best',
+                  },
                   format = format,
                },
                logtext{
                   filename = path,
-                  keys     = logkeys,
+                  keys     = {
+                     'epoch',
+                     'train_hardloss',
+                     'train_softloss',
+                     'train_acc',
+                     'valid_hardloss',
+                     'valid_softloss',
+                     'valid_acc',
+                     'learn_rate',
+                     'total_time',
+                     'new_best',
+                  },
                   format   = format,
                },
             },
@@ -379,27 +400,26 @@ local write = argcheck{
    {name='what', type='nn.Container'},
    call =
       function(where, what)
-         torch.save(where, what)
+         torch.save(where, what:clearState())
          print("File '" .. where .. "' saved.")
       end
 }
 
 
--- [[MAIN BEGINS HERE ]]----
-
 sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
 
-local logpath   = paths.concat(opts.net_dir,
-                               opts.log and opts.log or opts.task .. ".txt")
-local log       = create_log(logpath)
-local engine    = tnt.OptimEngine()
-local hard_loss = tnt.AverageValueMeter()
-local soft_loss = tnt.AverageValueMeter()
-local emmeter   = tnt.EMMeter()
-local timer     = tnt.TimeMeter()
-local stopper   = EarlyStopper(opts.try_epochs)
+local logname     = opts.log and opts.log or (opts.task .. (opts.train_path and "" or "_test") .. ".txt")
+local logpath     = paths.concat(opts.net_dir, logname)
+local log         = create_log(logpath)
+local engine      = tnt.OptimEngine()
+local hard_loss   = tnt.AverageValueMeter()
+local soft_loss   = tnt.AverageValueMeter()
+local emmeter     = tnt.EMMeter()
+local timer       = tnt.TimeMeter()
+local total_timer = tnt.TimeMeter()
+local stopper     = EarlyStopper(opts.try_epochs)
 
 engine.hooks.onStartEpoch = function(state)
    hard_loss:reset()
@@ -448,6 +468,7 @@ engine.hooks.onStart = function(state)
          valid_acc      = emmeter:value() * 100,
          learn_rate     = 0/0,
          epoch_time     = timer:value(),
+         total_time     = total_timer:value(),
          new_best       = stopper:improved() and '*' or '',
       }
       log:flush()
@@ -509,6 +530,7 @@ engine.hooks.onEndEpoch = function(state)
       valid_acc      = emmeter:value() * 100,
       learn_rate     = state.config.learningRate,
       epoch_time     = timer:value(),
+      total_time     = total_timer:value(),
       new_best       = stopper:improved() and '*' or '',
    }
    log:flush()
@@ -544,6 +566,8 @@ local specific      = torch.load(specific_path)
 
 local test_dataset = torch.load(paths.concat(opts.test_dir, opts.task) .. ".t7")
 
+total_timer:reset()
+
 if #args == 0 then -- only the first specific + shared parameters to train
    criterion = nn.BCECriterion()
 
@@ -554,6 +578,7 @@ if #args == 0 then -- only the first specific + shared parameters to train
    if opts.train_dir then
       local train_path = paths.concat(opts.train_dir, opts.task) .. ".t7"
       local train_dataset = torch.load(train_path):shuffle()
+
       net = require('weight-init')(net, opts.weight_init)
       engine:train{
          network     = net,
