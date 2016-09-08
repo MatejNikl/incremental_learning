@@ -1,0 +1,79 @@
+\documentclass[a4paper,twocolumn]{article}
+
+\usepackage[english]{babel} \usepackage[utf8]{inputenc} \usepackage[super]{nth}
+% \usepackage{graphicx}
+\usepackage[cm]{fullpage}
+% \pagenumbering{gobble}
+
+\title{Incremental Learning $-$ Final Report} \author{Matěj Nikl}
+
+\begin{document} \maketitle
+
+% \begin{abstract}
+% Incremental learning is a hard problem to solve.
+% \end{abstract}
+
+\section{Introduction}
+The task can be put simply $-$ implement a experimental architecture capable of
+incremental learning.
+
+That means to be able to leverage knowledge gained from learning previous
+task(s) to learn the current task faster, while not forgetting the previous
+ones.
+
+I chose to re-implement the model described in the paper \textit{Learning
+without Forgetting}, because I liked the idea and it felt like a good way to go.
+
+\section{Learning without Forgetting}
+The basic idea of Learning without Forgetting (LwF) architecture is to divide
+the neural network being used to solve the tasks into a \textit{shared} part,
+which is shared across all tasks and \textit{specific} parts, which are
+task-specific.
+
+Each time a new task is being learned, the old specific parts are trained in
+such a way that their responses to the new training data remain the same (even
+though the shared part is changing), while the new specific part is trained to
+solve the new task.
+
+The whole training procedure can be summarized into these steps:
+\begin{enumerate}
+    \item Save all outputs of old specific parts with temperatured softmax as a
+        activation function for the new training data
+    \item Train just the new specific part to solve the new task (the shared
+        part is frozen)
+    \item Train the whole network:
+        \begin{itemize}
+            \item old specific parts are trained in such a way that their
+                outputs remain the same (via KL Divergence loss) $-$ the
+                \textit{soft} target
+            \item new specific part is trained to solve the new task $-$ the
+                \textit{hard} target
+        \end{itemize}
+\end{enumerate}
+
+\section{Implementation details}
+My implementation does exactly the same thing as was proposed in the mentioned
+paper, results are, however, not as good.
+
+\subsection{Multi-label output} One of the obstacles I have had to face is the
+multi-label nature of the tasks. My solution for this problem is a output layer
+with matching number of neurons with sigmoid activation function. Interpretation
+is done by thresholding at 0.5.
+
+This solution is (as I have been told) not optimal. One would have to have the
+threshold for each class as a learnable parameter (i.e. the threshold 0.5 might
+not be optimal for all cases).
+
+Another solution could be doubling the number of classes $n$ $-$ having a neuron
+firing for the case when class $C$ is present, as well as when class $C$ is not
+present. Interpretation would then be done by selecting $n$ outputs with the
+highest probability.
+
+Even though the \textit{doubling} solution is fairly straight-forward to
+implement, I have not done so, because this has nothing to do with ultimate root
+of my worse results and I have spent my time struggling those.
+
+\subsection{The Soft Target}
+
+
+\end{document}
