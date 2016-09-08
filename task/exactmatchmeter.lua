@@ -50,14 +50,14 @@ EMMeter.add = argcheck{
       target = target:squeeze()
       output = output:squeeze()
       if output:nDimension() == 1 then
-         output = output:view(output:size(1), 1)
+         output = output:view(1, output:size(1))
       else
          assert(output:nDimension() == 2,
             'wrong output size (should be 1D or 2D with one column per class)'
          )
       end
       if target:nDimension() == 1 then
-         target = target:view(target:size(1), 1)
+         target = target:view(1, target:size(1))
       else
          assert(target:nDimension() == 2,
             'wrong target size (should be 1D or 2D with one column per class)'
