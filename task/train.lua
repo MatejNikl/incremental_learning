@@ -76,10 +76,10 @@ Further description to fill in...]])
    }
 
    op:option{
-      "--N",
+      "--T",
       default = 2,
-      dest    = "n",
-      help    = "N parameter for softmax lowering",
+      dest    = "t",
+      help    = "T parameter for softmax temperaturing",
    }
 
    op:option{
@@ -175,7 +175,7 @@ Further description to fill in...]])
    opts.split         = tonumber(opts.split)
    opts.try_epochs    = tonumber(opts.try_epochs)
    opts.batch_size    = tonumber(opts.batch_size)
-   opts.n             = tonumber(opts.n)
+   opts.t             = tonumber(opts.t)
    opts.lambda        = tonumber(opts.lambda)
    opts.weight_decay  = tonumber(opts.weight_decay)
    opts.learning_rate = tonumber(opts.learning_rate)
@@ -690,7 +690,7 @@ else
          specific_old,
          function(item)
             item:remove() -- remove last module
-            if opts.n ~= 1 then item:add(nn.MulConstant(1/opts.n)) end
+            if opts.t ~= 1 then item:add(nn.MulConstant(1/opts.t)) end
             item:add(nn.SoftMax())
          end
       )
@@ -797,7 +797,7 @@ else
          local module = net.modules[i+2]
          if opts.soft_crit == "DistKLDiv" then
             module:remove()
-            if opts.n ~= 1 then module:remove() end
+            if opts.t ~= 1 then module:remove() end
             module:add(nn.Sigmoid())
          end
 
