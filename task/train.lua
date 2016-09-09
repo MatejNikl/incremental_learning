@@ -91,9 +91,9 @@ Further description to fill in...]])
 
    op:option{
       "--soft-crit",
-      default = "KLDiv",
+      default = "DistKLDiv",
       dest    = "soft_crit",
-      help    = "criterion to use on soft target: KLDiv | Abs | MSE",
+      help    = "criterion to use on soft target: DistKLDiv | Abs | MSE",
    }
 
    op:option{
@@ -181,7 +181,7 @@ Further description to fill in...]])
    opts.learning_rate = tonumber(opts.learning_rate)
    opts.momentum      = tonumber(opts.momentum)
 
-   if opts.soft_crit ~= 'KLDiv'
+   if opts.soft_crit ~= 'DistKLDiv'
       and opts.soft_crit ~= 'Abs'
       and opts.soft_crit ~= 'MSE' then
       op:error("Unknown soft criterion!")
@@ -678,21 +678,13 @@ else
       args,
       function(item)
          -- for each old spec. net add criterion
-         local crit
-         if opts.soft_crit == "KLDiv" then
-            criterion:add(nn.DistKLDivCriterion(), opts.lambda/#args)
-         elseif opts.soft_crit == "Abs" then
-            criterion:add(nn.AbsCriterion(), opts.lambda/#args)
-         elseif opts.soft_crit == "MSE" then
-            criterion:add(nn.MSECriterion(), opts.lambda/#args)
-         end
-
+         criterion:add(nn[opts.soft_crit .. "Criterion"](), opts.lambda)
          -- and return loaded spec net
          return torch.load(item)
       end
    )
 
-   if opts.soft_crit == "KLDiv" then
+   if opts.soft_crit == "DistKLDiv" then
       -- modify old specific nets to output temperatured SoftMax
       tnt.utils.table.foreach(
          specific_old,
@@ -722,7 +714,7 @@ else
 
    log:status("INCREMENTAL TRAINING...")
 
-   if opts.soft_crit == "KLDiv" then
+   if opts.soft_crit == "DistKLDiv" then
       -- modify old specific nets to output temperatured LogSoftMax
       tnt.utils.table.foreach(
          specific_old,
@@ -803,7 +795,7 @@ else
    if cmdio.check_useragrees("Write trained nets") then
       for i = 1, #args do
          local module = net.modules[i+2]
-         if opts.soft_crit == "KLDiv" then
+         if opts.soft_crit == "DistKLDiv" then
             module:remove()
             if opts.n ~= 1 then module:remove() end
             module:add(nn.Sigmoid())
