@@ -410,7 +410,7 @@ sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
 
-local logname     = opts.log and opts.log or (opts.task .. (opts.train_path and "" or "_test") .. ".txt")
+local logname     = opts.log and opts.log or (opts.task .. (opts.train_dir and "" or "_test") .. ".txt")
 local logpath     = paths.concat(opts.net_dir, logname)
 local log         = create_log(logpath)
 local engine      = tnt.OptimEngine()
