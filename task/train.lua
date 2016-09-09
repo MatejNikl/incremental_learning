@@ -284,8 +284,12 @@ visualize_layer = argcheck{
             if module.__typename == "nn.Linear"
                or module.__typename == "nn.LinearDropconnect" then
                local nunits = module.weight:size(1)
-               parameters   = module.weight:view(nunits, 64, 64)
-               break
+               if module.weight:nElement() % (64 ^ 2) == 0 then
+                  parameters   = module.weight:view(nunits, 64, 64)
+                  break
+               else
+                  return
+               end
             elseif module.__typename == 'nn.Sequential' then
                return visualize_layer(path, module, per_row) -- recursion
             end
