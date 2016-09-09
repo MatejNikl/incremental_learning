@@ -122,7 +122,8 @@ local function create_net(opts, shared)
       if i < #opts.layers or shared then
          net:add(nn[opts.act]())
       else
-         net:add(nn.Sigmoid())
+         -- net:add(nn.Sigmoid())
+         net:add(nn.LogSoftMax())
       end
    end
 

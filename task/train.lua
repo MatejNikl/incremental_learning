@@ -12,6 +12,7 @@ require 'common'
 require 'dropconnect'
 require 'earlystopper'
 require 'exactmatchmeter'
+require 'MultiLabelClassNLLCriterion'
 
 
 local function parse_args(args)
@@ -318,7 +319,7 @@ local visual_check = argcheck{
          _G.interrupted = nil
          for data in dataset:iterator()() do
             w = image.display{image=data.input:view(1, 64, 64), win = w}
-            local a = net:forward(data.input):squeeze()
+            local a = net:forward(data.input):squeeze():exp()
             local b = data.target
             -- a = torch.cat(a, a:ge(0.5):double(), 2)
             print(torch.cat(a, b, 2):t())
@@ -569,7 +570,7 @@ local test_dataset = torch.load(paths.concat(opts.test_dir, opts.task) .. ".t7")
 total_timer:reset()
 
 if #args == 0 then -- only the first specific + shared parameters to train
-   criterion = nn.BCECriterion()
+   criterion = nn.MultiLabelClassNLLCriterion()
 
    net = nn.Sequential():add(shared):add(specific)
 
@@ -632,7 +633,7 @@ else
    print(specific)
 
    if opts.finetune then
-      criterion = nn.BCECriterion()
+      criterion = nn.MultiLabelClassNLLCriterion()
       log:status("Pre-processing dataset for fine-tuning...")
       local preprocessed_dataset = preprocess_dataset(train_dataset, shared, 'input')
       log:status("Fine-tuning new specific net...")
@@ -672,7 +673,7 @@ else
       log:flush()
    end
 
-   criterion = nn.ParallelCriterion():add(nn.BCECriterion()) -- for the new spec. net
+   criterion = nn.ParallelCriterion():add(nn.MultiLabelClassNLLCriterion()) -- for the new spec. net
 
    local specific_old = tnt.utils.table.foreach(
       args,
@@ -798,7 +799,7 @@ else
          if opts.soft_crit == "DistKLDiv" then
             module:remove()
             if opts.t ~= 1 then module:remove() end
-            module:add(nn.Sigmoid())
+            module:add(nn.LogSoftMax())
          end
 
          write(args[i], module)
