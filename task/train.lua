@@ -76,10 +76,10 @@ Further description to fill in...]])
    }
 
    op:option{
-      "--N",
+      "--T",
       default = 2,
-      dest    = "n",
-      help    = "N parameter for softmax lowering",
+      dest    = "t",
+      help    = "T parameter for softmax temperaturing",
    }
 
    op:option{
@@ -91,9 +91,9 @@ Further description to fill in...]])
 
    op:option{
       "--soft-crit",
-      default = "KLDiv",
+      default = "DistKLDiv",
       dest    = "soft_crit",
-      help    = "criterion to use on soft target: KLDiv | Abs | MSE",
+      help    = "criterion to use on soft target: DistKLDiv | Abs | MSE",
    }
 
    op:option{
@@ -175,13 +175,13 @@ Further description to fill in...]])
    opts.split         = tonumber(opts.split)
    opts.try_epochs    = tonumber(opts.try_epochs)
    opts.batch_size    = tonumber(opts.batch_size)
-   opts.n             = tonumber(opts.n)
+   opts.t             = tonumber(opts.t)
    opts.lambda        = tonumber(opts.lambda)
    opts.weight_decay  = tonumber(opts.weight_decay)
    opts.learning_rate = tonumber(opts.learning_rate)
    opts.momentum      = tonumber(opts.momentum)
 
-   if opts.soft_crit ~= 'KLDiv'
+   if opts.soft_crit ~= 'DistKLDiv'
       and opts.soft_crit ~= 'Abs'
       and opts.soft_crit ~= 'MSE' then
       op:error("Unknown soft criterion!")
@@ -410,7 +410,7 @@ sig.signal(sig.SIGINT, sig.signal_handler)
 
 local opts, args = parse_args(_G.arg)
 
-local logname     = opts.log and opts.log or (opts.task .. (opts.train_path and "" or "_test") .. ".txt")
+local logname     = opts.log and opts.log or (opts.task .. (opts.train_dir and "" or "_test") .. ".txt")
 local logpath     = paths.concat(opts.net_dir, logname)
 local log         = create_log(logpath)
 local engine      = tnt.OptimEngine()
@@ -678,27 +678,19 @@ else
       args,
       function(item)
          -- for each old spec. net add criterion
-         local crit
-         if opts.soft_crit == "KLDiv" then
-            criterion:add(nn.DistKLDivCriterion(), opts.lambda/#args)
-         elseif opts.soft_crit == "Abs" then
-            criterion:add(nn.AbsCriterion(), opts.lambda/#args)
-         elseif opts.soft_crit == "MSE" then
-            criterion:add(nn.MSECriterion(), opts.lambda/#args)
-         end
-
+         criterion:add(nn[opts.soft_crit .. "Criterion"](), opts.lambda)
          -- and return loaded spec net
          return torch.load(item)
       end
    )
 
-   if opts.soft_crit == "KLDiv" then
+   if opts.soft_crit == "DistKLDiv" then
       -- modify old specific nets to output temperatured SoftMax
       tnt.utils.table.foreach(
          specific_old,
          function(item)
             item:remove() -- remove last module
-            if opts.n ~= 1 then item:add(nn.MulConstant(1/opts.n)) end
+            if opts.t ~= 1 then item:add(nn.MulConstant(1/opts.t)) end
             item:add(nn.SoftMax())
          end
       )
@@ -722,7 +714,7 @@ else
 
    log:status("INCREMENTAL TRAINING...")
 
-   if opts.soft_crit == "KLDiv" then
+   if opts.soft_crit == "DistKLDiv" then
       -- modify old specific nets to output temperatured LogSoftMax
       tnt.utils.table.foreach(
          specific_old,
@@ -803,9 +795,9 @@ else
    if cmdio.check_useragrees("Write trained nets") then
       for i = 1, #args do
          local module = net.modules[i+2]
-         if opts.soft_crit == "KLDiv" then
+         if opts.soft_crit == "DistKLDiv" then
             module:remove()
-            if opts.n ~= 1 then module:remove() end
+            if opts.t ~= 1 then module:remove() end
             module:add(nn.Sigmoid())
          end
 

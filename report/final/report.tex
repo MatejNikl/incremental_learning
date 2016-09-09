@@ -15,14 +15,15 @@
 
 \section{Introduction}
 The task can be put simply $-$ implement a experimental architecture capable of
-incremental learning.
+\textbf{incremental learning}.
 
-That means to be able to leverage knowledge gained from learning previous
+What it means is to be able to leverage knowledge gained from learning previous
 task(s) to learn the current task faster, while not forgetting the previous
 ones.
 
 I chose to re-implement the model described in the paper \textit{Learning
-without Forgetting}, because I liked the idea and it felt like a good way to go.
+without Forgetting}, because I liked the idea and it felt like a good way to
+try.
 
 \section{Learning without Forgetting}
 The basic idea of Learning without Forgetting (LwF) architecture is to divide
@@ -52,28 +53,52 @@ The whole training procedure can be summarized into these steps:
 \end{enumerate}
 
 \section{Implementation details}
-My implementation does exactly the same thing as was proposed in the mentioned
-paper, results are, however, not as good.
+I tried to implement my version of the LwF
+architecture as close as possible to the proposed version (in which I have
+succeeded, I think), results do, however, differ a lot. I have then tried slight
+modifications to the base architecture in hope of better results, but only with
+limited or no success.
 
-\subsection{Multi-label output} One of the obstacles I have had to face is the
-multi-label nature of the tasks. My solution for this problem is a output layer
-with matching number of neurons with sigmoid activation function. Interpretation
-is done by thresholding at 0.5.
+\subsection{Multi-label output}
+One of the obstacles I have had to face is the multi-label nature of the tasks.
+At first I used a solution which uses the sigmoid activation function as the
+output, interpreted by thresholding at 0.5.
 
 This solution is (as I have been told) not optimal. One would have to have the
 threshold for each class as a learnable parameter (i.e. the threshold 0.5 might
 not be optimal for all cases).
 
-Another solution could be doubling the number of classes $n$ $-$ having a neuron
-firing for the case when class $C$ is present, as well as when class $C$ is not
-present. Interpretation would then be done by selecting $n$ outputs with the
-highest probability.
+Next solution I have implemented is doubling the number of classes $n$ $-$
+having a neuron firing for the case when class $C$ is present, as well as when
+class $C$ is not present. Interpretation is then done by selecting $n$ outputs
+with the highest value (regardless the output activation function).
 
-Even though the \textit{doubling} solution is fairly straight-forward to
-implement, I have not done so, because this has nothing to do with ultimate root
-of my worse results and I have spent my time struggling those.
+\subsection{The Hard Target}
+For sigmoid activation I have used averaged binary cross-entropy loss. For
+softmax activation function (which can only by used with the \textit{doubling}
+solution) I have used sum of multiclass cross-entropy for all present classes
+(as done in the paper).
 
 \subsection{The Soft Target}
+The paper suggests to use temperatured softmax as the output activation
+function together with the sum of KL Divergence losses for each old task. I have
+also tried to use absolute difference as well as MSE as the loss function
+together with sigmoid activation.
+
+\subsection{Incremental learning loss}
+The total loss is a weighted sum of the hard and the soft loss. This is a
+extension to what is proposed in the paper, because they take just the sum of
+those two. The intention behind the weights is to stimulate the ``not
+forgetting'' by giving the soft loss higher weight.
+
+\subsection{Convolutional shared part}
+In order to solve the harder version of the tasks, some sort of CNN must be
+used. Implementing it for the LwF architecture is no different from implementing
+it on its own. One just has to swap the shared part of the network with a CNN,
+everything else remains the same.
+
+\section{Results}
+
 
 
 \end{document}
