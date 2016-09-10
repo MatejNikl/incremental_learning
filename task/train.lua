@@ -458,6 +458,13 @@ engine.hooks.onStart = function(state)
       state.iterator:exec('select', 'train')
       state.iterator:exec('resample') -- call :resample() on the underlying dataset
 
+      local sl_val = soft_loss:value()
+      stopper:epoch(
+         emmeter:value(),
+         sl_val ~= sl_val and hard_loss:value() or sl_val,
+         state.network
+      )
+
       log:set{
          valid_hardloss = hard_loss:value(),
          valid_softloss = soft_loss:value(),
