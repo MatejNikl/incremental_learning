@@ -146,7 +146,7 @@ local function create_convnet()
 
    net:add(nn.View(-1):setNumInputDims(3))
 
-   net:add(nn.Linear(512, 64))
+   net:add(nn.Linear(512, 256))
    net:add(nn.ReLU(true))
 
    return net
