@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPTS="--seed 1337 --lambda 1 --try-epochs 10 --weight-decay 0.003 --learning-rate 0.001 --net-dir net --test-dir test_data --train-dir train_data --visualize"
+OPTS="--seed 1337 --lambda 1 --try-epochs 10 --weight-decay 0.003 --learning-rate 0.001 --net-dir net --test-dir test_data --train-dir train_data --visualize --finetune"
 PREV=""
 
 for i in $(seq 1 6); do
