@@ -41,7 +41,6 @@ th nncreator.lua --use-shared net/shared.t7 train_data/SCT?.t7 --dir net
 luarocks install csvigo
 luarocks install image
 luarocks install lua-glob-pattern
-luarocks install luafilesystem
 luarocks install luaposix
 luarocks install nn
 luarocks install nngraph

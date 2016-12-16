@@ -3,7 +3,6 @@ local sig  = require 'signal'
 local csv  = require 'csvigo'
 local glb  = require 'globtopattern'
 local img  = require 'image'
-local lfs  = require 'lfs'
 local tnt  = require 'torchnet'
 local xlua = require 'xlua' -- opts parser, progress bar
 
@@ -101,8 +100,11 @@ local target_table = {}
 local input_dims
 local target_dims
 
+local entries = paths.dir(opts.dir)
+table.sort(entries)
+
 xlua.progress(total, #csv_data)
-for fn in lfs.dir(opts.dir) do
+for _, fn in ipairs(entries) do
 
    if string.match(fn, opts.pattern) then
       total = total + 1
@@ -143,7 +145,7 @@ if not _G.interrupted then
    end
 
    local input  = tnt.utils.table.mergetensor(input_table)
-   local target = tnt.utils.table.mergetensor(target_table)
+   local target = tnt.utils.table.mergetensor(target_table):squeeze()
 
    local mean = opts.mean and opts.mean or input:mean()
    local std  = opts.std and opts.std or input:std()
